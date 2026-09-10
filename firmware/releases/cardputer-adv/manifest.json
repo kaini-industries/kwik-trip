@@ -7,7 +7,7 @@
     "flash_mode": "dio",
     "flash_freq": "80m"
   },
-  "source_commit": "a07dfbe824db0b9a3ba1cb3ca949d0d01239205a",
+  "source_commit": "94e51848075e0210421c9ce5afdbb593cf539076",
   "source_dirty": false,
   "source_inputs": {
     ".python-version": "7b55f8e67b5623c4bef3fa691288da9437d79d3aba156de48d481db32ac7d16d",
@@ -15,8 +15,8 @@
     "config/platformio/hosts.ini": "33f9bac61d06057a081bd08b0672701af9f9b173aa65c00cf25da0fbb0248d50",
     "config/platformio/tests.ini": "5ec2c7dd8ba397085f4d63263624317475c5d3e5bba07a071e30966bb5d20323",
     "firmware/programmer/include/gpio_wire.h": "eef85dcf2aaf1a3dc4b651739d6f7ee8a483a8f11807636f9f87ddf655dd5036",
-    "firmware/programmer/src/display/App.cpp": "84078a4aff52e1e1b2ab1fd15311950efcb38005a750362c8a740acadf029df4",
-    "firmware/programmer/src/display/App.hpp": "f8463ef1941c735cf68bc35ef94765f4f830ffce46728c739976facd5dbb5ab7",
+    "firmware/programmer/src/display/App.cpp": "996a5c8ac0603a9bd5b05265361e611d29ca4dd1b3031238d4736107b390de58",
+    "firmware/programmer/src/display/App.hpp": "0f5cc058e632c2516e2424c75b0b97b1a1d41efcd6a6081a0e50630f9777969a",
     "firmware/programmer/src/display/BleBridge.cpp": "6cd09b1ceae96c3a68b636eccbf12bad2398ac61fde3f2e2ec77f03b10fa61f7",
     "firmware/programmer/src/display/BleBridge.hpp": "f7548a4a52da32e7f5dec598fc0cca6123bacacebbe05f0982fce4243dd504aa",
     "firmware/programmer/src/display/ImageLibrary.cpp": "2b3ad2510b9d6b78eed07afb61b41df4ebc5d7ee4f9862344bf26676738dd1f6",
@@ -32,10 +32,12 @@
     "firmware/programmer/src/display/TargetStore.hpp": "740b385c0f26c924d06e4ca39271d34c297b2918763823722f543b08f9be7068",
     "firmware/programmer/src/display/Theme.hpp": "aef296cf97d469657afe609eebe2182f23eb8b5cf2a247c7cf4d86776fabfe80",
     "firmware/programmer/src/gpio_wire.cpp": "7dab2a6bf242b5cc2b45f572efd599483674d4af42cdc60838bd1619f29a654c",
-    "firmware/programmer/src/main.cpp": "48c382f0df18cdf20504dad03d2401fb35990de1cead4fd84b5f15c0d63ca409",
+    "firmware/programmer/src/main.cpp": "d9ecd53c098c2440f628e25eb26d9fe1f7fa1be239aae76b56cc8b95df4b5e13",
+    "firmware/programmer/src/oepl/OeplMode.cpp": "261926152837e0c1f6c773fb26b1b2ad45398e35887ca5f9770e89855e8eae24",
+    "firmware/programmer/src/oepl/OeplMode.hpp": "f7bb374344ff6d5a72e01c68cb6bf1eef4e536272d3a43d038e3f599ee4f300e",
     "firmware/programmer/src/sd_card.cpp": "ec656f6d5eb3b8fd9e29d7ef226b0e2c7a041cf2f4727cfadac2574b83b3503c",
     "firmware/programmer/src/sd_card.h": "b1eb0e383b50d3f2e5ab3bd1ace5081636b471d746a0013a774571b4c9abb201",
-    "lib/EtagCore/library.json": "8b17daeca95676f1ff5a0b6933033ab856e8bcf9faecdc5b1695a4e86ad923b9",
+    "lib/EtagCore/library.json": "138a75e6a5b1895795755729612f79917802ff5ff8f6e35d607fa9094b52e515",
     "lib/EtagCore/src/core.cpp": "e4a112e5665e8322ca02cad1b26489ff47b9089ede668b112e28370c035e5f4a",
     "lib/EtagCore/src/etag/core.h": "713e00a0721a2083cbeb48f5a60c82615bd670d8f5d1e7035629610741c71ff0",
     "lib/EtagCore/src/etag/display/BoundedLine.hpp": "ee07b1d85c5d522b42b6573f4c6361f3fbe428189d06f1586b7cb23f9d891db4",
@@ -51,6 +53,8 @@
     "lib/EtagCore/src/etag/display/TargetProtocol.cpp": "a270ba365a0e3c286d02864e8834cdbeb75e25b3193459481f6997054b2cf470",
     "lib/EtagCore/src/etag/display/TargetProtocol.hpp": "bad12929ede1d69055ed8b82c91d7a839e3ef2af94cd22aecc96fb7e66b50436",
     "lib/EtagCore/src/etag/display/Validation.hpp": "047fdc0d6cdad093a5ed8090c72c91a87a274852dd4f9d63022b1c204df9270e",
+    "lib/EtagCore/src/etag/oepl/Api.cpp": "84377a6d3f3e638b1d050604df0504e7ceade71c92f33462c8742608d89ef3c0",
+    "lib/EtagCore/src/etag/oepl/Api.hpp": "e6d4b33e0edde44f823ad1bb0d1fbc51edda4a850b9920e6fcbd85caa8e36f51",
     "platformio.ini": "396f7d58f5665e6c394c9536d5a38d2d670975220ca1f1e07d3ce8f42de309e2",
     "profiles/tags/ses-edg3-0220-b.json": "ac18b5e818d1792bcfeadf8c10053755399a42bfe4e36b9ad4df90a2e7ad3795",
     "profiles/tags/ses-erd3-0210-a.json": "427cbd0368aab7d01ffc3df73821adca8d581e6c190e73362b7f792bda70f95f",
@@ -83,18 +87,18 @@
     },
     {
       "offset": 65536,
-      "size": 1257136,
-      "sha256": "cc2f62be05ad8888c5d87722c4e80c54cb10c18a22fa9dc6f697be162260872d"
+      "size": 1659056,
+      "sha256": "1af92f02acc830e54131801e2929e37c21f149ba0ccfe06a387a644669adcb4b"
     }
   ],
   "files": {
     "cardputer-adv-factory.bin": {
-      "size": 1322672,
-      "sha256": "786f7373210dc4a8adce70acfa96dd0bcb72e3bcafc73b4055f5536acb71653f"
+      "size": 1724592,
+      "sha256": "880402da2630c8a0707fff6cb32ff5647d22ab244f8c0b16165d33b53f414d99"
     },
     "cardputer-adv-app.bin": {
-      "size": 1257136,
-      "sha256": "cc2f62be05ad8888c5d87722c4e80c54cb10c18a22fa9dc6f697be162260872d"
+      "size": 1659056,
+      "sha256": "1af92f02acc830e54131801e2929e37c21f149ba0ccfe06a387a644669adcb4b"
     }
   },
   "hardware_validation": "pending"
