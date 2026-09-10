@@ -1,0 +1,991 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>etag — Cardputer display editor</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2'><rect x='3' y='3' width='18' height='18' rx='2'/><path d='M7 7h10M7 12h10M7 17h6'/></svg>">
+  <style>
+    :root {
+      --bg: #000000;
+      --card-bg: #090909;
+      --card-border: #181818;
+      --card-border-hover: #2a2a2a;
+      --card-hover: #121212;
+      --text: #ffffff;
+      --text-muted: #888888;
+      --text-dim: #444444;
+      --accent: #ffffff;
+      --accent-green: #10b981;
+      --accent-amber: #f59e0b;
+      --accent-red: #ef4444;
+      --radius: 8px;
+      --radius-sm: 4px;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 13px;
+      line-height: 1.5;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    header {
+      background: rgba(0, 0, 0, 0.85);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--card-border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      padding: 0 16px;
+    }
+
+    .top-bar {
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      max-width: 680px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 800;
+      font-size: 14px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      user-select: none;
+    }
+
+    .brand span {
+      color: var(--text-muted);
+      font-size: 11px;
+      font-weight: 600;
+      border: 1px solid var(--card-border);
+      padding: 1px 6px;
+      border-radius: var(--radius-sm);
+    }
+
+    .connect-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 6px 12px;
+      border-radius: 9999px;
+      border: 1px solid var(--card-border);
+      background: var(--card-bg);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      color: var(--text);
+      transition: all 0.15s ease;
+    }
+
+    .connect-pill:hover {
+      border-color: var(--card-border-hover);
+      background: var(--card-hover);
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background-color: var(--text-dim);
+    }
+
+    .status-dot.online {
+      background-color: var(--accent-green);
+      box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+    }
+
+    .status-dot.busy {
+      background-color: var(--accent-amber);
+      box-shadow: 0 0 8px rgba(245, 158, 11, 0.6);
+      animation: pulse 1s infinite;
+    }
+
+    .status-dot.error {
+      background-color: var(--accent-red);
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+
+    main {
+      flex: 1;
+      max-width: 680px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 14px 16px 80px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .tag-hero-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 8px 12px;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+    }
+
+    .tag-select-wrapper {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .tag-select {
+      width: 100%;
+      background: transparent;
+      border: none;
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 600;
+      outline: none;
+      cursor: pointer;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      overflow: hidden;
+    }
+
+    .tag-select option {
+      background: #111111;
+      color: #ffffff;
+    }
+
+    .tag-specs-badge {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+
+    .btn-icon {
+      background: transparent;
+      border: 1px solid var(--card-border);
+      color: var(--text);
+      padding: 5px 9px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .btn-icon:hover {
+      background: var(--card-hover);
+      border-color: var(--card-border-hover);
+    }
+    .screen-stage {
+      background: #050505;
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+    }
+
+    .screen-bezel {
+      background: #ffffff;
+      padding: 4px;
+      border-radius: 4px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.8), inset 0 0 0 1px #e5e5e5;
+      max-width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    #esl-canvas {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      background-color: #ffffff;
+    }
+    .transmit-hud {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.88);
+      border-radius: var(--radius);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      padding: 24px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+      z-index: 10;
+    }
+
+    .transmit-hud.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .hud-label {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+    }
+
+    .hud-progress-bg {
+      width: 100%;
+      max-width: 320px;
+      height: 6px;
+      background: #222222;
+      border-radius: 9999px;
+      overflow: hidden;
+    }
+
+    .hud-progress-bar {
+      height: 100%;
+      width: 0%;
+      background: #ffffff;
+      transition: width 0.15s ease;
+    }
+
+    .btn-push {
+      width: 100%;
+      height: 48px;
+      background: #ffffff;
+      color: #000000;
+      border: none;
+      border-radius: var(--radius);
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: transform 0.1s ease, background 0.15s ease;
+      user-select: none;
+    }
+
+    .btn-push:hover {
+      background: #ececec;
+    }
+
+    .btn-push:active {
+      transform: scale(0.99);
+    }
+
+    .btn-push:disabled {
+      background: #333333;
+      color: #777777;
+      cursor: not-allowed;
+      transform: none;
+    }
+    .tab-bar {
+      display: flex;
+      background: #090909;
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      padding: 3px;
+      gap: 3px;
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 8px 4px;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      user-select: none;
+    }
+
+    .tab-btn.active {
+      background: #181818;
+      color: #ffffff;
+    }
+    .view-panel {
+      display: none;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .view-panel.active {
+      display: flex;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .card-title {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .card-subtitle {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: -8px;
+    }
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .form-label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--text-muted);
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .input-text, .select-styled {
+      width: 100%;
+      height: 38px;
+      background: #000000;
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius-sm);
+      padding: 0 10px;
+      color: #ffffff;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      outline: none;
+      transition: border-color 0.15s ease;
+    }
+
+    .input-text:focus, .select-styled:focus {
+      border-color: #555555;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .input-row .input-text {
+      flex: 1;
+    }
+
+    .btn {
+      height: 38px;
+      padding: 0 16px;
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      border: 1px solid transparent;
+      user-select: none;
+      transition: all 0.15s ease;
+    }
+
+    .btn-primary {
+      background: #ffffff;
+      color: #000000;
+    }
+
+    .btn-primary:hover {
+      background: #e5e5e5;
+    }
+
+    .btn-secondary {
+      background: #141414;
+      color: #ffffff;
+      border-color: var(--card-border);
+    }
+
+    .btn-secondary:hover {
+      background: #202020;
+      border-color: var(--card-border-hover);
+    }
+
+    .btn-danger {
+      background: #1a0808;
+      color: var(--accent-red);
+      border-color: #3b1111;
+    }
+
+    .btn-danger:hover {
+      background: #2b0c0c;
+    }
+
+    .btn-sm {
+      height: 30px;
+      padding: 0 10px;
+      font-size: 11px;
+    }
+    .dropzone {
+      border: 1px dashed var(--card-border-hover);
+      border-radius: var(--radius);
+      padding: 24px 16px;
+      text-align: center;
+      cursor: pointer;
+      background: #050505;
+      transition: all 0.15s ease;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .dropzone:hover, .dropzone.drag-over {
+      border-color: #666666;
+      background: #0d0d0d;
+    }
+
+    .dropzone-icon {
+      font-size: 24px;
+    }
+
+    .dropzone-text {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .dropzone-sub {
+      font-size: 10px;
+      font-family: var(--font-mono);
+      color: var(--text-muted);
+    }
+    .pill-group {
+      display: flex;
+      background: #000000;
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius-sm);
+      padding: 2px;
+      gap: 2px;
+    }
+
+    .pill-opt {
+      flex: 1;
+      padding: 6px 2px;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 11px;
+      font-weight: 600;
+      text-align: center;
+      border-radius: 3px;
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.15s ease;
+    }
+
+    .pill-opt.active {
+      background: #222222;
+      color: #ffffff;
+    }
+    .range-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .range-input {
+      flex: 1;
+      height: 4px;
+      background: #222222;
+      border-radius: 2px;
+      outline: none;
+      -webkit-appearance: none;
+    }
+
+    .range-input::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #ffffff;
+      cursor: pointer;
+    }
+
+    .range-val {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      width: 32px;
+      text-align: right;
+      color: var(--text-muted);
+    }
+    .scanner-wrap {
+      position: relative;
+      width: 100%;
+      height: 240px;
+      background: #000000;
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+      border: 1px solid var(--card-border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #scanner-video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: none;
+    }
+
+    .scanner-reticle {
+      position: absolute;
+      width: 220px;
+      height: 140px;
+      border: 2px solid rgba(255, 255, 255, 0.4);
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      pointer-events: none;
+    }
+
+    .scan-laser {
+      width: 100%;
+      height: 2px;
+      background: var(--accent-red);
+      box-shadow: 0 0 8px var(--accent-red);
+      animation: scanLaser 2s ease-in-out infinite alternate;
+    }
+
+    @keyframes scanLaser {
+      0% { transform: translateY(0); }
+      100% { transform: translateY(136px); }
+    }
+    .tag-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px;
+      background: #000000;
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius-sm);
+      gap: 12px;
+    }
+
+    .tag-item.active {
+      border-color: #444444;
+      background: #0a0a0a;
+    }
+
+    .tag-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .tag-title {
+      font-weight: 700;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .tag-meta {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .tag-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .modal-sheet {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.8);
+      backdrop-filter: blur(8px);
+      display: none;
+      align-items: flex-end;
+      justify-content: center;
+      z-index: 200;
+      padding: 16px;
+    }
+
+    .modal-sheet.active {
+      display: flex;
+    }
+
+    .modal-card {
+      background: #0c0c0c;
+      border: 1px solid var(--card-border-hover);
+      border-radius: var(--radius);
+      max-width: 480px;
+      width: 100%;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      animation: slideUp 0.2s ease;
+    }
+
+    @keyframes slideUp {
+      from { transform: translateY(20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    footer {
+      max-width: 680px;
+      margin: 0 auto;
+      width: 100%;
+      padding: 16px;
+      border-top: 1px solid var(--card-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-dim);
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="top-bar">
+      <div class="brand">
+        etag <span>Display editor</span>
+      </div>
+      <button class="connect-pill" id="btn-header-connect">
+        <span class="status-dot" id="header-status-dot"></span>
+        <span id="header-status-text">CONNECT</span>
+      </button>
+    </div>
+  </header>
+
+  <main>
+    <div class="tag-hero-bar">
+      <div class="tag-select-wrapper">
+        <select class="tag-select" id="header-target-select">
+          <option value="">Loading tags…</option>
+        </select>
+      </div>
+      <div class="tag-specs-badge" id="studio-tag-specs">--</div>
+      <button class="btn-icon" id="btn-quick-blink" title="Send blink signal to active tag">
+        <span>💡</span> BLINK
+      </button>
+    </div>
+    <div class="screen-stage">
+      <div class="screen-bezel">
+        <canvas id="esl-canvas" width="296" height="152"></canvas>
+      </div>
+      <div class="transmit-hud" id="transmit-hud">
+        <div class="hud-label" id="hud-status">TRANSMITTING OVER INFRARED…</div>
+        <div class="hud-progress-bg">
+          <div class="hud-progress-bar" id="hud-progress-fill"></div>
+        </div>
+        <div style="font-family: var(--font-mono); font-size: 11px; color: #888888;" id="hud-percent">0%</div>
+      </div>
+    </div>
+    <button class="btn-push" id="btn-send-esl">
+      <span>📥</span> PUSH TO CARDPUTER
+    </button>
+    <div class="tab-bar">
+      <button class="tab-btn active" data-view="view-image">
+        <span>🖼️</span> IMAGE PUSH
+      </button>
+      <button class="tab-btn" data-view="view-plugins">
+        <span>⚡</span> PLUGINS
+      </button>
+      <button class="tab-btn" data-view="view-tags">
+        <span>🏷️</span> TAGS (<span id="tab-tag-count">0</span>)
+      </button>
+      <button class="tab-btn" data-view="view-connect">
+        <span>⚙️</span> CONNECT
+      </button>
+    </div>
+    <section id="view-image" class="view-panel active">
+      <div class="card">
+        <div class="card-title">PUSH IMAGE TO ESL</div>
+        <div class="card-subtitle">Prepare artwork, transfer it to the Cardputer, then send over infrared.</div>
+
+        <input type="file" id="file-studio-input" accept="image/*" style="display: none;">
+
+        <div class="dropzone" id="studio-dropzone">
+          <div class="dropzone-icon">📷</div>
+          <div class="dropzone-text">CHOOSE PHOTO OR TAKE PICTURE</div>
+          <div class="dropzone-sub">Click to browse, or paste image from clipboard</div>
+        </div>
+
+        <div class="form-group" style="margin-top: 4px;">
+          <div class="form-label">FIT MODE</div>
+          <div class="pill-group" id="group-fit-mode">
+            <button class="pill-opt active" data-fit="cover">COVER</button>
+            <button class="pill-opt" data-fit="contain">CONTAIN</button>
+            <button class="pill-opt" data-fit="stretch">STRETCH</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <div class="form-label">DITHER ALGORITHM</div>
+          <div class="pill-group" id="group-dither-algo">
+            <button class="pill-opt active" data-algo="floyd">FLOYD-STEINBERG (PHOTO)</button>
+            <button class="pill-opt" data-algo="threshold">THRESHOLD (GRAPHIC)</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <div class="form-label">
+            <span>CONTRAST</span>
+            <span class="range-val" id="lbl-contrast">0</span>
+          </div>
+          <div class="range-wrap">
+            <input type="range" class="range-input" id="slider-contrast" min="-100" max="100" value="0">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <div class="form-label">
+            <span>THRESHOLD</span>
+            <span class="range-val" id="lbl-threshold">128</span>
+          </div>
+          <div class="range-wrap">
+            <input type="range" class="range-input" id="slider-threshold" min="1" max="254" value="128">
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 16px; margin-top: 4px;">
+          <label style="display: flex; align-items: center; gap: 8px; font-size: 11px; cursor: pointer; user-select: none;">
+            <input type="checkbox" id="chk-invert" style="accent-color: #ffffff;">
+            <span>INVERT BLACK/WHITE</span>
+          </label>
+          <label style="display: flex; align-items: center; gap: 8px; font-size: 11px; cursor: pointer; user-select: none;">
+            <input type="checkbox" id="chk-color-plane" checked style="accent-color: #ffffff;">
+            <span>RENDER COLOR ACCENT</span>
+          </label>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="transfer-speed">TRANSMISSION MODE</label>
+          <select id="transfer-speed" class="form-input">
+            <option value="reliable">Reliable</option>
+            <option value="fast">Fast</option>
+          </select>
+          <div class="card-subtitle">Fast shortens image transmission. Use Reliable if a tag misses an update.</div>
+        </div>
+        <div class="form-group" style="margin-top: 4px;">
+          <div class="form-label">DESTINATION PAGE</div>
+          <div class="pill-group" id="group-target-page">
+            <button class="pill-opt active" data-page="1">PAGE 1 (ACTIVE)</button>
+            <button class="pill-opt" data-page="2">PAGE 2 (SECONDARY)</button>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section id="view-plugins" class="view-panel">
+      <div class="card">
+        <div class="card-title">METRIC PLUGINS</div>
+        <div class="card-subtitle">Generate dynamic artwork for your ESL tag</div>
+
+        <div class="pill-group" id="group-plugin-select">
+          <button class="pill-opt active" data-plugin="github">GITHUB</button>
+          <button class="pill-opt" data-plugin="crypto">CRYPTO</button>
+          <button class="pill-opt" data-plugin="clock">CLOCK</button>
+        </div>
+
+        <div id="plugin-form-slot" style="display: flex; flex-direction: column; gap: 12px; margin-top: 4px;">
+        </div>
+
+        <button class="btn btn-primary" id="btn-plugin-render" style="margin-top: 4px;">
+          RENDER TO CANVAS
+        </button>
+      </div>
+    </section>
+    <section id="view-tags" class="view-panel">
+      <div class="card">
+        <div class="card-title">
+          <span>ADD TAG VIA BARCODE</span>
+          <span style="font-size: 10px; color: var(--accent-green);">DUAL-ENGINE</span>
+        </div>
+        <div class="card-subtitle">Scan ESL Code 128 barcode or pick from camera roll</div>
+
+        <div class="scanner-wrap" id="scanner-container">
+          <video id="scanner-video" playsinline muted autoplay></video>
+          <div class="scanner-reticle" id="scanner-reticle" style="display: none;">
+            <div class="scan-laser"></div>
+          </div>
+          <div id="scanner-placeholder" style="text-align: center; color: var(--text-muted); font-size: 11px; padding: 16px;">
+            Camera inactive.<br>Tap "OPEN CAMERA" or snap a photo.
+          </div>
+        </div>
+
+        <div class="input-row">
+          <button class="btn btn-primary" id="btn-toggle-cam" style="flex: 1;">
+            <span>📸</span> OPEN CAMERA
+          </button>
+          <input type="file" id="file-barcode-snap" accept="image/*" capture="environment" style="display: none;">
+          <button class="btn btn-secondary" id="btn-snap-barcode" style="flex: 1;">
+            <span>📁</span> SCAN PHOTO
+          </button>
+        </div>
+        <div id="scan-result-box" style="display: none; background: #000000; border: 1px solid #333333; border-radius: var(--radius-sm); padding: 12px; gap: 8px; flex-direction: column;">
+          <div style="display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 11px;">
+            <span style="color: var(--text-muted);">CODE:</span>
+            <b id="res-barcode" style="color: #ffffff;">-</b>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 11px;">
+            <span style="color: var(--text-muted);">MODEL:</span>
+            <b id="res-model" style="color: #ffffff;">-</b>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 11px;">
+            <span style="color: var(--text-muted);">PLID:</span>
+            <b id="res-plid" style="color: var(--accent-green);">-</b>
+          </div>
+
+          <div class="form-group" style="margin-top: 4px;">
+            <div class="form-label">ASSIGN NAME</div>
+            <div class="input-row">
+              <input type="text" class="input-text" id="input-scanned-name" placeholder="e.g. Desk Tag" maxlength="15">
+              <button class="btn btn-primary" id="btn-save-scanned">SAVE TAG</button>
+            </div>
+          </div>
+        </div>
+        <details style="margin-top: 4px;">
+          <summary style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); cursor: pointer;">
+            Or enter a barcode manually ▾
+          </summary>
+          <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px;">
+            <div class="input-row">
+              <input type="text" class="input-text" id="manual-code-input" placeholder="17-character IR tag barcode">
+              <input type="text" class="input-text" id="manual-name-input" placeholder="Tag Name" style="max-width: 120px;">
+            </div>
+            <div class="input-row">
+              <select class="select-styled" id="manual-model-select" aria-label="Display preset for unknown models">
+                <option value="1317">SmartTag HD S (152×152 Mono)</option>
+                <option value="1339">SmartTag HD S Red (152×152 BWR)</option>
+                <option value="1318">SmartTag HD M (208×112 Mono)</option>
+                <option value="1327" selected>SmartTag HD M Red (208×112 BWR)</option>
+                <option value="1315">SmartTag HD L (296×128 Mono)</option>
+                <option value="1328">SmartTag HD L Red (296×128 BWR)</option>
+                <option value="1344">SmartTag HD L Yellow (296×128 BWY)</option>
+                <option value="1314">SmartTag HD110 (400×300 Mono)</option>
+                <option value="1336">SmartTag HD110 Red (400×300 BWR)</option>
+                <option value="1626">SmartTag Color 2.6 (296×152 4-Color)</option>
+              </select>
+              <button class="btn btn-secondary" id="btn-manual-save">ADD</button>
+            </div>
+          </div>
+        </details>
+      </div>
+      <div class="card">
+        <div class="card-title">
+          <span>SAVED TAGS (CARDPUTER NVS)</span>
+          <button class="btn-icon" id="btn-refresh-tags" title="Sync tags from device">↻ SYNC</button>
+        </div>
+        <div id="saved-tags-list" style="display: flex; flex-direction: column; gap: 8px;">
+          <div style="color: var(--text-muted); font-size: 11px; text-align: center; padding: 20px;">
+            (Connecting to Cardputer…)
+          </div>
+        </div>
+      </div>
+    </section>
+    <section id="view-connect" class="view-panel">
+      <div class="card">
+        <div class="card-title">WIRELESS & WIRED LINK</div>
+        <div class="card-subtitle">On the Cardputer: 3 Browser editor → 1 USB or 2 Bluetooth. Select the same connection here.</div>
+
+        <div class="form-group">
+          <div class="form-label">TRANSPORT</div>
+          <div class="pill-group" id="group-transport">
+            <button class="pill-opt" data-transport="ble">BLUETOOTH (BLE)</button>
+            <button class="pill-opt active" data-transport="serial">USB SERIAL</button>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 8px; margin-top: 4px;">
+          <button class="btn btn-primary" id="btn-connect-active" style="flex: 1;">
+            CONNECT VIA USB SERIAL
+          </button>
+          <button class="btn btn-danger btn-sm" id="btn-disconnect-active" style="display: none;">
+            DISCONNECT
+          </button>
+        </div>
+
+        <div style="background: #000000; border: 1px solid var(--card-border); border-radius: var(--radius-sm); padding: 12px; font-family: var(--font-mono); font-size: 11px; line-height: 1.8; color: var(--text-muted); margin-top: 6px;">
+          <div>STATUS: <b id="info-conn-status" style="color: #ffffff;">Disconnected</b></div>
+          <div>DEVICE: <span id="info-device-name" style="color: #ffffff;">-</span></div>
+          <div>TRANSPORT: <span id="info-transport-type" style="color: #ffffff;">SERIAL</span></div>
+        </div>
+
+        <div style="color: var(--text-dim); font-size: 11px; line-height: 1.5; margin-top: 8px;">
+          Use desktop Chrome or Edge for USB serial. Bluetooth availability depends on the browser and operating system.
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div>ETAG // CARDPUTER ADVANCE</div>
+  </footer>
+
+  <script src="vendor/zxing.min.js"></script>
+  <script src="app.js"></script>
+<footer style="padding:16px;text-align:center;font-size:12px">IR content updates for compatible PP4/PP16 tags. Transmission is not an acknowledgement.<br>Adapted from <a href="https://github.com/i12bp8/tagtinker-adv">TagTinker ADV</a> · <a href="LICENSE.txt">GPL-3.0-only</a> · <a href="SOURCE.txt">Source and notices</a></footer>
+</body>
+</html>

@@ -65,6 +65,20 @@ class ProfileTests(unittest.TestCase):
         self.assertEqual(first, e.generated_header(h, profiles))
         self.assertIn("etag::Protocol::Unknown", first)
         self.assertIn("kDD = 4, kDC = 6, kReset = 15", first)
+        self.assertIn("kIrTx = 44", first)
+        self.assertIn("kSdClock = 40", first)
+
+    def test_cardputer_peripheral_conflicts_and_wrong_board_pins_rejected(self):
+        catalog = e.read_json(ROOT / "config/hosts.json")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "config").mkdir()
+            for pin in (4, 12, 43, True):
+                changed = copy.deepcopy(catalog)
+                changed["hosts"][0]["peripherals"]["ir_tx"] = pin
+                (root / "config/hosts.json").write_text(json.dumps(changed))
+                with self.subTest(pin=pin), self.assertRaises(ValueError):
+                    e.load_hosts(root)
 
 
 class HexTests(unittest.TestCase):

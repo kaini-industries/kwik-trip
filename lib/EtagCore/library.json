@@ -1,6 +1,9 @@
 {
   "name": "EtagCore",
-  "version": "0.1.0",
-  "description": "Platform-independent tag profiles and read-only debug probing",
-  "build": {"includeDir": "src"}
+  "version": "0.2.0",
+  "description": "Portable wired diagnostics and PP4/PP16 display protocols",
+  "build": {
+    "includeDir": "src"
+  },
+  "license": "GPL-3.0-only"
 }

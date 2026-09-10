@@ -107,7 +107,7 @@ def load_hosts(root=ROOT):
         raise ValueError("hosts must be a nonempty list")
     ids = set()
     for h in catalog["hosts"]:
-        keys(h, "id name board soc dd dc reset reserved_pins notes", "host")
+        keys(h, "id name board soc dd dc reset reserved_pins notes peripherals", "host")
         for field in ("id", "name", "board", "soc", "notes"):
             text_value(h[field], field)
         if not re.fullmatch(r"[a-z][a-z0-9-]{1,63}", h["id"]) or h["id"] in ids:
@@ -127,6 +127,20 @@ def load_hosts(root=ROOT):
         forbidden |= {0, 3, 19, 20, 26, 27, 28, 29, 30, 31, 32, 45, 46} if h["soc"] == "esp32s3" else {0, 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 15}
         if len(set(pins)) != 3 or not set(pins) <= valid or set(pins) & forbidden:
             raise ValueError(f'{h["id"]}: invalid, duplicate or reserved GPIO assignment')
+        peripherals = h["peripherals"]
+        if peripherals is not None:
+            keys(peripherals, "ir_tx sd", "peripherals")
+            keys(peripherals["sd"], "clock miso mosi cs hz", "SD")
+            pp = [peripherals["ir_tx"]] + [peripherals["sd"][k] for k in ("clock", "miso", "mosi", "cs")]
+            for pin in pp:
+                integer(pin, 0, 48, "peripheral pin")
+            if len(set(pp)) != 5 or not set(pp) <= valid or set(pp) & set(pins):
+                raise ValueError("invalid or conflicting peripheral pins")
+            integer(peripherals["sd"]["hz"], 100000, 25000000, "SD clock")
+        if h["id"] == "cardputer-adv" and peripherals != {
+            "ir_tx": 44, "sd": {"clock": 40, "miso": 39, "mosi": 14, "cs": 12, "hz": 4000000}
+        }:
+            raise ValueError("Cardputer Advance onboard peripherals must match its schematic")
     return catalog["hosts"]
 
 
@@ -138,6 +152,12 @@ def generated_header(host, profiles):
              f'constexpr const char* kHostName = {quote(host["name"])};',
              f'constexpr int kDD = {host["dd"]}, kDC = {host["dc"]}, kReset = {host["reset"]};',
              "constexpr etag::TargetProfile kProfiles[] = {"]
+    if host["peripherals"]:
+        peripherals = host["peripherals"]
+        sd = peripherals["sd"]
+        lines.insert(-1, f'constexpr int kIrTx = {peripherals["ir_tx"]};')
+        lines.insert(-1, f'constexpr int kSdClock = {sd["clock"]}, kSdMiso = {sd["miso"]}, kSdMosi = {sd["mosi"]}, kSdCs = {sd["cs"]};')
+        lines.insert(-1, f'constexpr unsigned kSdHz = {sd["hz"]};')
     for p in profiles:
         protocol = "TiCcDebug" if p["protocol"] == "ti_cc_debug" else "Unknown"
         lines.append("    {%s, %s, etag::Protocol::%s, %s, %d, %d}," % (

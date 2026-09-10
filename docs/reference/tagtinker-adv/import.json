@@ -1,0 +1,158 @@
+{
+  "repository": "https://github.com/i12bp8/tagtinker-adv",
+  "commit": "fb8a0669bbdfe77c51bdbd5adbb8cb2ab00f2db2",
+  "license": "GPL-3.0-only",
+  "imported_on": "2026-09-10",
+  "sources": [
+    {
+      "upstream": "src/App.cpp",
+      "local": "firmware/programmer/src/display/App.cpp",
+      "upstream_sha256": "74ecec1c9314b2de9f8d166920c5ea8270e5dd2953fd37d2bd0d6870be770389"
+    },
+    {
+      "upstream": "src/App.hpp",
+      "local": "firmware/programmer/src/display/App.hpp",
+      "upstream_sha256": "bc9471dcd13078b8938385e2b9c04f3cb76d3ddbfc9f46464581889b30992055"
+    },
+    {
+      "upstream": "src/BleBridge.cpp",
+      "local": "firmware/programmer/src/display/BleBridge.cpp",
+      "upstream_sha256": "bba95dec9e281963bdd7fab5dd36c94de8155eb8e7c57439dd1ac8bfb4f77155"
+    },
+    {
+      "upstream": "src/BleBridge.hpp",
+      "local": "firmware/programmer/src/display/BleBridge.hpp",
+      "upstream_sha256": "a6a69fdc293f40500760fdc79765ecb3bd1dadee2436fc04b69a30c9524a0de8"
+    },
+    {
+      "upstream": "src/BroadcastProtocol.cpp",
+      "local": "lib/EtagCore/src/etag/display/BroadcastProtocol.cpp",
+      "upstream_sha256": "ff23a99665a6af3dbe108490bc71484b574d9831972f63c639e1be8a6cbe573b"
+    },
+    {
+      "upstream": "src/BroadcastProtocol.hpp",
+      "local": "lib/EtagCore/src/etag/display/BroadcastProtocol.hpp",
+      "upstream_sha256": "4fbdebe0e54e1854a28eec82a063fb9b0ac9038571002ada2f15356404f7bdcf"
+    },
+    {
+      "upstream": "src/EslFrame.cpp",
+      "local": "lib/EtagCore/src/etag/display/EslFrame.cpp",
+      "upstream_sha256": "ba771dff95c58e01aa3cabe8b8860c3990308d67479917b1e5e555ecc3ca53d2"
+    },
+    {
+      "upstream": "src/EslFrame.hpp",
+      "local": "lib/EtagCore/src/etag/display/EslFrame.hpp",
+      "upstream_sha256": "46f58e748f432bcdcfbc2024b25c546cd752066be1ebdf2d785ce396ec77f0de"
+    },
+    {
+      "upstream": "src/ImageCodec.cpp",
+      "local": "lib/EtagCore/src/etag/display/ImageCodec.cpp",
+      "upstream_sha256": "38f9cd4a80444d5d830056376706facfd1ff7dcdf3c50e108665fd8080ddd446"
+    },
+    {
+      "upstream": "src/ImageCodec.hpp",
+      "local": "lib/EtagCore/src/etag/display/ImageCodec.hpp",
+      "upstream_sha256": "360cc39dcd3dd1a9b40e04c1b61a4c9cd4d7d79d86be710bacc1690c2364e508"
+    },
+    {
+      "upstream": "src/ImageLibrary.cpp",
+      "local": "firmware/programmer/src/display/ImageLibrary.cpp",
+      "upstream_sha256": "5ddf37605e8be646b1cf9db651b8ad1a995bf0a922471824607b279e5459f372"
+    },
+    {
+      "upstream": "src/ImageLibrary.hpp",
+      "local": "firmware/programmer/src/display/ImageLibrary.hpp",
+      "upstream_sha256": "50fa4e553d34b53a37c53cf4098993ea4b5a3adea6f308e67abe48e359cc3c79"
+    },
+    {
+      "upstream": "src/InfraredTransmitter.cpp",
+      "local": "firmware/programmer/src/display/InfraredTransmitter.cpp",
+      "upstream_sha256": "31a4e1e1698da9a4cde78dfa21f4c2693d34b90e1066ead91e6f09b30bea7d1b"
+    },
+    {
+      "upstream": "src/InfraredTransmitter.hpp",
+      "local": "firmware/programmer/src/display/InfraredTransmitter.hpp",
+      "upstream_sha256": "9f8d08ccde4b6ad781e9865aa12aa03c6113633f508942fca51c0f4a4aec937a"
+    },
+    {
+      "upstream": "src/InfraredWaveform.cpp",
+      "local": "lib/EtagCore/src/etag/display/InfraredWaveform.cpp",
+      "upstream_sha256": "20b2281dd57b6902a2b77e6a3b8da8fee120e3058c8bec56091eb59143109d9e"
+    },
+    {
+      "upstream": "src/InfraredWaveform.hpp",
+      "local": "lib/EtagCore/src/etag/display/InfraredWaveform.hpp",
+      "upstream_sha256": "7c1a4a53df077c6fcf2d57dbc8dad8382c4ef9689fe42502419887c7d8335209"
+    },
+    {
+      "upstream": "src/TargetProtocol.cpp",
+      "local": "lib/EtagCore/src/etag/display/TargetProtocol.cpp",
+      "upstream_sha256": "a270ba365a0e3c286d02864e8834cdbeb75e25b3193459481f6997054b2cf470"
+    },
+    {
+      "upstream": "src/TargetProtocol.hpp",
+      "local": "lib/EtagCore/src/etag/display/TargetProtocol.hpp",
+      "upstream_sha256": "bad12929ede1d69055ed8b82c91d7a839e3ef2af94cd22aecc96fb7e66b50436"
+    },
+    {
+      "upstream": "src/TargetRenderer.cpp",
+      "local": "firmware/programmer/src/display/TargetRenderer.cpp",
+      "upstream_sha256": "85b4f0dfa3bbb8d4274252bfa8738a9d6f53a872b4bea0d37f61d98dc2f02a79"
+    },
+    {
+      "upstream": "src/TargetRenderer.hpp",
+      "local": "firmware/programmer/src/display/TargetRenderer.hpp",
+      "upstream_sha256": "ccd6867fee128ca7a3901b34586c12d4c360d36c61780e642645d8e40a5b1232"
+    },
+    {
+      "upstream": "src/TargetStore.cpp",
+      "local": "firmware/programmer/src/display/TargetStore.cpp",
+      "upstream_sha256": "894a119c0c7f4845e23329a4c0b215785c5325e2338dfa2049557fabde228ee3"
+    },
+    {
+      "upstream": "src/TargetStore.hpp",
+      "local": "firmware/programmer/src/display/TargetStore.hpp",
+      "upstream_sha256": "cd340649a9b2668baff51fc061ad9b989b45dcb736a792488de05fb4afc14ec5"
+    },
+    {
+      "upstream": "src/Theme.hpp",
+      "local": "firmware/programmer/src/display/Theme.hpp",
+      "upstream_sha256": "aef296cf97d469657afe609eebe2182f23eb8b5cf2a247c7cf4d86776fabfe80"
+    },
+    {
+      "upstream": "web/app.js",
+      "local": "web/app.js",
+      "upstream_sha256": "5ff7007ccb7990ebab8b5d9287c01f676bfc9f56d23edc1fa46ea1f44e2d6017"
+    },
+    {
+      "upstream": "web/index.html",
+      "local": "web/index.html",
+      "upstream_sha256": "bd93b274ad33009c52fcc9848d8cb21259a384162e3dfab5902c61786ebebfb7"
+    },
+    {
+      "upstream": "web/vendor/ZXING-LICENSE",
+      "local": "web/vendor/ZXING-LICENSE",
+      "upstream_sha256": "849b3ff4527ff587eecc78736b5685bbba7a44b071f3b944da914e832292f6c0"
+    },
+    {
+      "upstream": "web/vendor/zxing.min.js",
+      "local": "web/vendor/zxing.min.js",
+      "upstream_sha256": "d7cc8f69dd70bdcf3ac00c9ae572bf2acb9f4132ba379c72df842e4db918652d"
+    },
+    {
+      "upstream": "tests/protocol.cpp",
+      "local": "tests/display/protocol.cpp",
+      "upstream_sha256": "81653a6240e78b9a6c412f334797701f983317999b2b1b450b5209c154356120"
+    },
+    {
+      "upstream": "tests/reliability.cpp",
+      "local": "tests/display/reliability.cpp",
+      "upstream_sha256": "40ec3133949b9edee44db648ef2933bdfab63d01cd6b3676f5b7fe5380ab42ee"
+    },
+    {
+      "upstream": "tests/web.cjs",
+      "local": "tests/display/web.cjs",
+      "upstream_sha256": "b3706faa4fd1e832e71abaf7818f54aeec8c4de36c99ab79c0189cb8a17754a2"
+    }
+  ]
+}

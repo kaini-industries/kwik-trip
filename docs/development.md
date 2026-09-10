@@ -10,7 +10,8 @@ Use the project-local Python 3.12 virtual environment. A global PlatformIO insta
 | ESP image tool and Python dependencies | esptool 4.9.0, constrained requirements |
 | M5Cardputer | commit `2d4fa6646e4e5b47e0af96214b003aa7b15b8d81` (upstream tag 1.2.0; manifest still reports 1.1.1) |
 | M5Unified / M5GFX | 0.2.21 / 0.2.28 |
-| IRremote transitive dependency | 4.4.1; no IR feature enabled |
+| Display protocol source | TagTinker ADV commit `fb8a0669bbdfe77c51bdbd5adbb8cb2ab00f2db2`, adapted locally |
+| Browser test runtime | Node.js 22.14.0 in CI; Node 22+ locally |
 | Native platform / Unity | 1.2.1 / 2.6.1 |
 | Intel MCS51 platform / SDCC package | 2.2.0 / 1.40100.12072 (SDCC 4.1.0, revision 12072) |
 
@@ -30,7 +31,7 @@ upload_port = /dev/cu.YOUR_DEVICE
 monitor_port = /dev/cu.YOUR_DEVICE
 ```
 
-The ordered `extra_configs` list loads this optional file after the committed definitions, so overrides do not depend on filesystem enumeration order. Keep the same environment name and board/pin profile; new boards get new committed environments. There are no Wi-Fi credentials or services in this scaffold.
+The ordered `extra_configs` list loads this optional file after the committed definitions, so overrides do not depend on filesystem enumeration order. Keep the same environment name and board/pin profile; new boards get new committed environments. There is no Wi-Fi service; the browser editor connects over USB or BLE.
 
 `make validate` is the broad check. Use `make test`, `make build-hosts`, or `make build-tag` while iterating. Build/test never uploads firmware. The CC2510 pre-build script rejects upload targets even if requested, because the generic serial uploader does not speak TI debug.
 
@@ -40,6 +41,7 @@ To run the same checks individually, activate the virtual environment with `sour
 python tools/etag.py check
 python -m unittest discover -s tests -v
 pio test -e native
+python tools/test_display.py
 pio run -e cardputer-adv -e esp32-devkit -e esp32-s3-devkit
 pio run -d firmware/targets/cc2510
 ```
@@ -48,6 +50,8 @@ The root project creates firmware for the Cardputer/ESP32. The final command cre
 
 A successful ESP32 compile checks toolchain/library compatibility, not keyboard, SD, voltage, reset timing, or tag communication. Record physical validation in the per-host and per-tag hardware notes. CI artifacts distinguish `programmer-*` binaries from `cc2510f32-smoke-compile-only` HEX files.
 
-The [GitHub Actions workflow](../.github/workflows/ci.yml) first validates the catalog and runs Python/native tests, then builds all three ESP32 hosts and the independent CC2510 example. It never uploads to connected devices. Python is selected from `.python-version`; the pip cache explicitly hashes both `requirements-dev.txt` and `requirements-lock.txt`, since the default cache lookup expects a differently named requirements file. The actions use pinned release commits with the Node 24 runtime.
+The [GitHub Actions workflow](../.github/workflows/ci.yml) first validates the catalog and runs Python/native tests, then builds all three ESP32 hosts and the independent CC2510 example. It never uploads to connected devices. Python is selected from `.python-version`; the pip cache explicitly hashes both `requirements-dev.txt` and `requirements-lock.txt`, since the default cache lookup expects a differently named requirements file. Actions use pinned release commits; the display tests explicitly select Node 22.14.0.
 
 Artifact uploads explicitly include the selected files inside `.pio` and fail if no outputs are found. They contain ESP32 application binaries/debug ELFs or CC2510 diagnostic HEX/map files, rather than a complete installation bundle. Use PlatformIO's local upload command for the ESP32 bootloader and partition offsets. CI success establishes software/build compatibility; physical tag support is recorded separately.
+
+`tools/test_display.py` compiles the imported frame/codec/waveform suites and persistence/input-boundary integration tests with AddressSanitizer and UBSan, then runs the browser codec and upload tests. Use macOS/Linux (or WSL) with a C++17 compiler for this sanitizer suite. It is part of `make validate` and CI. `make studio` serves `web/` on localhost only, without credentials or external hosting.

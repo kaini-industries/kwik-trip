@@ -9,3 +9,6 @@ Begin with the root [Cardputer quickstart](../README.md#start-with-the-cardputer
 - [Tag firmware projects](../firmware/targets/README.md): programs for the tags' own MCUs.
 - [Hardware inventory and templates](../hardware/README.md): evidence and bench records.
 - [Tooling](../tools/README.md): package/backup commands.
+
+- [Display editing](workflows/display-editing.md): IR devices, text, SD images and browser workflows.
+- [Cardputer validation](workflows/cardputer-validation.md): reproducible software checks and pending bench tests.

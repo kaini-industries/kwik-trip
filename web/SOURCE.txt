@@ -1,0 +1,6 @@
+etag display editor, adapted from TagTinker ADV (GPL-3.0-only).
+Upstream: https://github.com/i12bp8/tagtinker-adv/tree/fb8a0669bbdfe77c51bdbd5adbb8cb2ab00f2db2
+Modified 2026-09-10 for etag: https://github.com/kaini-industries/kwik-trip
+Corresponding source is included with this project, in web/, firmware/programmer/src/display/, and lib/EtagCore/src/etag/display/.
+Do not publish a binary/web distribution without making its corresponding source available to its recipients.
+Bundled ZXing: Apache-2.0; see vendor/ZXING-LICENSE.
