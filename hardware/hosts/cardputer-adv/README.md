@@ -17,4 +17,6 @@ The EXT header's supply is 5 V. Add a regulator and measure its output before at
 
 Prototype parts: 2×7 breakout, regulator with its required decoupling, manual target-power switch, short flexible leads, labelled tag connector, multimeter, and strain relief. Prefer a current-limited bench supply for initial investigation. Disconnect other caps/accessories to avoid shared pin contention.
 
-Reserved buses remain available for onboard peripherals: keyboard/audio/IMU use G8/G9, and microSD uses G12/G14/G39/G40. This application uses the SD bus only after `sd`. The display is managed by M5Stack's libraries. Runtime identification must report Cardputer Advance before probing is enabled.
+Reserved buses remain available for onboard peripherals: keyboard/audio/IMU use G8/G9, and microSD uses G12/G14/G39/G40. The shared SD adapter mounts after `sd` in the wired console or when opening the image library. The display is managed by M5Stack's libraries. Runtime identification must report Cardputer Advance before probing, SD or infrared initialization is enabled.
+
+The display editor uses the onboard infrared emitter on G44, with pin assignments generated from `config/hosts.json`. It sends PP4/PP16 content updates to compatible tags using their existing firmware and normal battery supply. It does not require this wired adapter. See [display editing](../../../docs/workflows/display-editing.md) and [physical validation](../../../docs/workflows/cardputer-validation.md). These operations remain unverified on physical hardware in this project.
