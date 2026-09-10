@@ -8,7 +8,7 @@ Build from the repository root:
 .venv/bin/pio run -e cardputer-adv
 ```
 
-The application is generated at `.pio/build/cardputer-adv/firmware.bin`, alongside its bootloader, partition data, and debug ELF. Follow the root [installation instructions](../../README.md#start-with-the-cardputer-advance) to upload with PlatformIO. This folder uses the root `platformio.ini`; it is not an independent PlatformIO project.
+The application is generated at `.pio/build/cardputer-adv/firmware.bin`, alongside its bootloader, partition data, and debug ELF. [Prebuilt factory and Launcher images](../releases/cardputer-adv/README.md) are committed in the repository; regenerate a local package with `make package-cardputer`. Follow the root [installation instructions](../../README.md#start-with-the-cardputer-advance) to upload with PlatformIO. This folder uses the root `platformio.ini`; it is not an independent PlatformIO project.
 
 On boot, the firmware initializes Cardputer peripherals and opens the workbench menu: 1 IR devices, 2 Wired diagnostics, 3 Browser editor. It waits for an explicit command before probing a tag. A Cardputer Advance runtime board check blocks probing, IR initialization and SD mounting if a different M5 board is detected.
 

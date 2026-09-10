@@ -3,8 +3,15 @@
 *.pdf binary
 *.bin binary
 *.hex text eol=lf
+# Build-input fingerprints must match across Windows, macOS and Linux checkouts.
 *.py text eol=lf
+*.cpp text eol=lf
+*.h text eol=lf
+*.hpp text eol=lf
 *.ini text eol=lf
+*.json text eol=lf
+requirements-*.txt text eol=lf
+.python-version text eol=lf
 # Keep archived originals byte-for-byte on every checkout.
 docs/reference/legacy/* -text
 docs/plans/cardputer-advance-flashing-plan.md -text

@@ -37,6 +37,17 @@ Adding a profile records a device; it does not implement its protocol. See the [
 
 ## Start with the Cardputer Advance
 
+**Prebuilt firmware is committed in [firmware/releases/cardputer-adv](firmware/releases/cardputer-adv/README.md).** You can install it without compiling:
+
+| Installer | Download |
+| --- | --- |
+| **M5Burner 3** or **standard ESP32 USB flashing** | [cardputer-adv-factory.bin](firmware/releases/cardputer-adv/cardputer-adv-factory.bin), complete image at **0x0** |
+| **bmorcelli/Launcher**, through its SD browser or WebUI | [cardputer-adv-app.bin](firmware/releases/cardputer-adv/cardputer-adv-app.bin), application only; Launcher chooses its partition |
+
+On GitHub, open the file and select **Download raw file**. Follow the [installation guide](firmware/releases/cardputer-adv/README.md) for checksums, M5Burner's account-based upload workflow, Launcher, and esptool commands. Factory USB installation replaces an existing Launcher setup and clears saved Cardputer settings. Physical validation is pending.
+
+### Build from source
+
 Open [etag.code-workspace](etag.code-workspace) in VS Code, or use a terminal in the project root. With Python 3.12 installed:
 
 ```sh
@@ -45,7 +56,7 @@ python3.12 -m venv .venv
 .venv/bin/pio run -e cardputer-adv
 ```
 
-The application output is `.pio/build/cardputer-adv/firmware.bin`. PlatformIO also generates the bootloader and partition data. Use its upload command to install the complete build at the correct offsets.
+The application output is `.pio/build/cardputer-adv/firmware.bin`. `make package-cardputer` also generates the complete factory image and named application image under `.pio/build/cardputer-adv/release/`. PlatformIO's upload command installs the separate build components at their correct offsets.
 
 Keep the tag disconnected while installing firmware on the **Cardputer**, and replace `/dev/cu.YOUR_DEVICE` with its actual USB port:
 
@@ -131,6 +142,7 @@ This validates profiles, reference hashes and documentation links, runs Python/C
 | --- | --- |
 | [firmware/programmer](firmware/programmer/README.md), [lib/EtagCore](lib/EtagCore) | Cardputer/ESP32 application and portable protocol code |
 | [firmware/targets](firmware/targets/README.md) | Firmware projects for the tags themselves |
+| [firmware/releases/cardputer-adv](firmware/releases/cardputer-adv/README.md) | Committed Cardputer factory/app downloads, checksums and installation guide |
 | [config](config), [profiles](profiles/README.md) | Host definitions, pinned build environments, and tag catalog |
 | [hardware](hardware/README.md) | Tag photos, adapter documentation, pad maps, and inventory templates |
 | [tools](tools/README.md) | Profile, image package, verification, and backup tools |

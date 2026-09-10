@@ -35,6 +35,8 @@ Package creation requires a verified profile and embeds a snapshot of it. The cu
 
 The `backups/` area holds per-unit acquisitions; `artifacts/` holds reproducible derived output. Both are ignored by Git. Archive originals and evidence under `hardware/` and `docs/reference/`, where checks protect the original-file hashes.
 
+Curated Cardputer distribution binaries are committed separately under `firmware/releases/cardputer-adv/`. The PlatformIO `package` target merges its actual bootloader, partition table, initial OTA data and application into a zero-offset factory image for M5Burner/USB flashing. A separate application image lets Launcher select its own app partition. Checksums, image/layout validation and source fingerprints protect the downloads against accidental corruption and staleness.
+
 ## Display editing
 
 TagTinker-derived protocol/frame/codec/waveform code lives under `lib/EtagCore/src/etag/display/` and remains independent of Arduino. The Cardputer adapters and menu live under `firmware/programmer/src/display/`; other ESP32 builds exclude those adapters. The existing TI core and tag-firmware projects remain independent.

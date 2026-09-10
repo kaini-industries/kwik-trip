@@ -52,6 +52,21 @@ A successful ESP32 compile checks toolchain/library compatibility, not keyboard,
 
 The [GitHub Actions workflow](../.github/workflows/ci.yml) first validates the catalog and runs Python/native tests, then builds all three ESP32 hosts and the independent CC2510 example. It never uploads to connected devices. Python is selected from `.python-version`; the pip cache explicitly hashes both `requirements-dev.txt` and `requirements-lock.txt`, since the default cache lookup expects a differently named requirements file. Actions use pinned release commits; the display tests explicitly select Node 22.14.0.
 
-Artifact uploads explicitly include the selected files inside `.pio` and fail if no outputs are found. They contain ESP32 application binaries/debug ELFs or CC2510 diagnostic HEX/map files, rather than a complete installation bundle. Use PlatformIO's local upload command for the ESP32 bootloader and partition offsets. CI success establishes software/build compatibility; physical tag support is recorded separately.
+Artifact uploads explicitly include the selected files inside `.pio` and fail if no outputs are found. The `programmer-*` artifacts contain application binaries/debug ELFs; `cardputer-adv-flashable` additionally contains complete factory and Launcher application images with checksums and a manifest. The CC2510 artifact contains diagnostic HEX/map files. The [committed Cardputer downloads](../firmware/releases/cardputer-adv/README.md) remain available directly in Git even when Actions artifacts expire. CI success establishes software/build compatibility; physical tag support is recorded separately.
 
 `tools/test_display.py` compiles the imported frame/codec/waveform suites and persistence/input-boundary integration tests with AddressSanitizer and UBSan, then runs the browser codec and upload tests. Use macOS/Linux (or WSL) with a C++17 compiler for this sanitizer suite. It is part of `make validate` and CI. `make studio` serves `web/` on localhost only, without credentials or external hosting.
+
+## Refresh the committed Cardputer binaries
+
+`make package-cardputer` builds and verifies a local package, including during development. `make release-cardputer` does a clean build, creates the package, then copies only the two binaries, manifest and checksums to `firmware/releases/cardputer-adv/`. It never flashes hardware or publishes to a service.
+
+1. Remove `config/platformio/local.ini` before packaging; local overrides are rejected for distribution builds.
+2. Commit firmware/build-input changes locally first. The release manifest records that source commit, and promotion rejects packages built from modified or untracked build inputs.
+3. Run `make release-cardputer`, then `make validate`.
+4. Commit the updated files in `firmware/releases/cardputer-adv/`, then push both commits. CI rejects stale binaries when build inputs change without refreshing the downloads.
+
+On Windows with the virtual environment activated, the equivalent commands are `pio run -e cardputer-adv -t clean`, `pio run -e cardputer-adv -t package`, `python tools/cardputer_release.py publish`, and `python tools/cardputer_release.py verify`. The `publish` subcommand only copies files into this checkout; it makes no network requests.
+
+Build-input fingerprints cover application/core sources, host/tag metadata, dependency locks, PlatformIO configuration and packaging hooks. Documentation-only edits do not force a rebuild. For offline integrity/source checks use `make verify-release`; no PlatformIO build cache is needed. Image verification uses pinned esptool 4.9.0's parser and explicitly checks its checksum and digest results. Tests exercise corrupted images, wrong offsets and stale source detection.
+
+The factory image must stay compatible with M5Burner 3 and zero-offset ESP32 flashing. The separate app image must remain suitable for Launcher's SD/WebUI installer without replacing its bootloader or hard-coding its app partition. Review the [installation guide](../firmware/releases/cardputer-adv/README.md) whenever the partition scheme or hardware changes.
