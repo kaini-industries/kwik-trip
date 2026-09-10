@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "settings": {
+    "chip": "esp32s3",
+    "board": "m5stack-stamps3",
+    "flash_size": "8MB",
+    "flash_mode": "dio",
+    "flash_freq": "80m"
+  },
+  "source_commit": "88d52ce0c3b1fd4fa858187ceca35fc475d2856d",
+  "source_dirty": false,
+  "source_inputs": {
+    ".python-version": "7b55f8e67b5623c4bef3fa691288da9437d79d3aba156de48d481db32ac7d16d",
+    "config/hosts.json": "d6609bf0cfd9691f3e38ee959845e183259a6cb8fc4d9e4d7850a73ce0a6d63e",
+    "config/platformio/hosts.ini": "33f9bac61d06057a081bd08b0672701af9f9b173aa65c00cf25da0fbb0248d50",
+    "config/platformio/tests.ini": "5ec2c7dd8ba397085f4d63263624317475c5d3e5bba07a071e30966bb5d20323",
+    "firmware/programmer/include/gpio_wire.h": "eef85dcf2aaf1a3dc4b651739d6f7ee8a483a8f11807636f9f87ddf655dd5036",
+    "firmware/programmer/src/display/App.cpp": "c0561015a27a2a583a0139d565a66ab6c7b84400d71ca934ef9b47058d1d943b",
+    "firmware/programmer/src/display/App.hpp": "285cba157ce7f6f33aad4679276b7a846efab8106575a67a2b9799c9b7bd2bfe",
+    "firmware/programmer/src/display/BleBridge.cpp": "d106d94d3081fb27e629079e00be6d33e4b508a94aba039fb61ecfdb6e06e7ab",
+    "firmware/programmer/src/display/BleBridge.hpp": "b0dbda8fdf8b592c99b6067ce161056c284fa7c6a4ba6ab986203642a8485863",
+    "firmware/programmer/src/display/ImageLibrary.cpp": "2b3ad2510b9d6b78eed07afb61b41df4ebc5d7ee4f9862344bf26676738dd1f6",
+    "firmware/programmer/src/display/ImageLibrary.hpp": "bb47cf4d15154433afd0266e5ea08c4c76b8f4f9872d08de9ba86e7e9933e80c",
+    "firmware/programmer/src/display/InfraredTransmitter.cpp": "1230ba382b625b9cec9475d8c64448d1a5e707fb97a153125fb4023aeac01880",
+    "firmware/programmer/src/display/InfraredTransmitter.hpp": "1dd89f619e9d326153d8b5a903a82b3d8161d74217e9b7f32733f5e2641ec046",
+    "firmware/programmer/src/display/TargetRenderer.cpp": "c8f2d8e9d2e6197da6790b37c3fcb6ac11d6b256b8d1e83d063a03439c3b73e8",
+    "firmware/programmer/src/display/TargetRenderer.hpp": "589df9c0efde1258cd458e5a0b4def49612b4484005c65985c40034cf289203c",
+    "firmware/programmer/src/display/TargetStore.cpp": "b255f491e6baf5fa232ddad1ada06dc4aa4136a3ef7236dd12fbe4eecf16c392",
+    "firmware/programmer/src/display/TargetStore.hpp": "740b385c0f26c924d06e4ca39271d34c297b2918763823722f543b08f9be7068",
+    "firmware/programmer/src/display/Theme.hpp": "aef296cf97d469657afe609eebe2182f23eb8b5cf2a247c7cf4d86776fabfe80",
+    "firmware/programmer/src/gpio_wire.cpp": "7dab2a6bf242b5cc2b45f572efd599483674d4af42cdc60838bd1619f29a654c",
+    "firmware/programmer/src/main.cpp": "24c9e56b3f94ffc2057fcdf34da0f307184df90b3eeb6d5cd3d290118b9a1141",
+    "firmware/programmer/src/sd_card.cpp": "ec656f6d5eb3b8fd9e29d7ef226b0e2c7a041cf2f4727cfadac2574b83b3503c",
+    "firmware/programmer/src/sd_card.h": "b1eb0e383b50d3f2e5ab3bd1ace5081636b471d746a0013a774571b4c9abb201",
+    "lib/EtagCore/library.json": "8b17daeca95676f1ff5a0b6933033ab856e8bcf9faecdc5b1695a4e86ad923b9",
+    "lib/EtagCore/src/core.cpp": "e4a112e5665e8322ca02cad1b26489ff47b9089ede668b112e28370c035e5f4a",
+    "lib/EtagCore/src/etag/core.h": "713e00a0721a2083cbeb48f5a60c82615bd670d8f5d1e7035629610741c71ff0",
+    "lib/EtagCore/src/etag/display/BoundedLine.hpp": "ee07b1d85c5d522b42b6573f4c6361f3fbe428189d06f1586b7cb23f9d891db4",
+    "lib/EtagCore/src/etag/display/BroadcastProtocol.cpp": "ff23a99665a6af3dbe108490bc71484b574d9831972f63c639e1be8a6cbe573b",
+    "lib/EtagCore/src/etag/display/BroadcastProtocol.hpp": "4fbdebe0e54e1854a28eec82a063fb9b0ac9038571002ada2f15356404f7bdcf",
+    "lib/EtagCore/src/etag/display/EslFrame.cpp": "ba771dff95c58e01aa3cabe8b8860c3990308d67479917b1e5e555ecc3ca53d2",
+    "lib/EtagCore/src/etag/display/EslFrame.hpp": "46f58e748f432bcdcfbc2024b25c546cd752066be1ebdf2d785ce396ec77f0de",
+    "lib/EtagCore/src/etag/display/ImageCodec.cpp": "38f9cd4a80444d5d830056376706facfd1ff7dcdf3c50e108665fd8080ddd446",
+    "lib/EtagCore/src/etag/display/ImageCodec.hpp": "360cc39dcd3dd1a9b40e04c1b61a4c9cd4d7d79d86be710bacc1690c2364e508",
+    "lib/EtagCore/src/etag/display/InfraredWaveform.cpp": "20b2281dd57b6902a2b77e6a3b8da8fee120e3058c8bec56091eb59143109d9e",
+    "lib/EtagCore/src/etag/display/InfraredWaveform.hpp": "7c1a4a53df077c6fcf2d57dbc8dad8382c4ef9689fe42502419887c7d8335209",
+    "lib/EtagCore/src/etag/display/JsonEnvelope.hpp": "c98ca468ecd6f20f993927545a8feba204a016c908d05edcf9f9830bd0787d8b",
+    "lib/EtagCore/src/etag/display/TargetProtocol.cpp": "a270ba365a0e3c286d02864e8834cdbeb75e25b3193459481f6997054b2cf470",
+    "lib/EtagCore/src/etag/display/TargetProtocol.hpp": "bad12929ede1d69055ed8b82c91d7a839e3ef2af94cd22aecc96fb7e66b50436",
+    "lib/EtagCore/src/etag/display/Validation.hpp": "047fdc0d6cdad093a5ed8090c72c91a87a274852dd4f9d63022b1c204df9270e",
+    "platformio.ini": "59169d4f6cb42a9319dad46b97cd818c4b3e35299840427498d6032fa5c9c2db",
+    "profiles/tags/ses-edg3-0220-b.json": "ac18b5e818d1792bcfeadf8c10053755399a42bfe4e36b9ad4df90a2e7ad3795",
+    "profiles/tags/ses-erd3-0210-a.json": "427cbd0368aab7d01ffc3df73821adca8d581e6c190e73362b7f792bda70f95f",
+    "requirements-dev.txt": "e937bc907f8e7c9f864309ac031f5731cf15e9d82109d266ca799ba13ffdee09",
+    "requirements-lock.txt": "ab293becb16957dee4e35ae8c71205cde144817c0caac9769c6bdb5d55a5697e",
+    "tools/cardputer_release.py": "54324ad9334938feed5de63a321055421b23e9a50693d69b7992e7a3de2034e3",
+    "tools/etaglib.py": "6464654eb46e0441ec40ee1854b9f7eca5f7fcedb96e1640d0be1bdb1c9bfc17",
+    "tools/pio_prepare.py": "e8ce364abf11b68c5172bcc8416d826eeffaae634ffd4f2f9dab9a5bfc16b80c",
+    "tools/pio_release.py": "9c3eb7f0b292697bb2c65b30b8d1ab9c6fb039297ae760ca253132e79e25ea89"
+  },
+  "tools": {
+    "platformio": "6.1.19",
+    "esptool": "4.9.0"
+  },
+  "components": [
+    {
+      "offset": 0,
+      "size": 15104,
+      "sha256": "1776e4dd896a69d0a5c2e79957b0e2a88aa4129b1381d6478683515a1f6af343"
+    },
+    {
+      "offset": 32768,
+      "size": 3072,
+      "sha256": "1d9cca96de0fe07ad7fc0648b9878ddecd9ce565e38b589ad20fea698ed4c80c"
+    },
+    {
+      "offset": 57344,
+      "size": 8192,
+      "sha256": "f94c5d786a7a8fab06ac5d10e33bf37711a6697636dc037559ea19cc410a17f0"
+    },
+    {
+      "offset": 65536,
+      "size": 1249808,
+      "sha256": "a5051ff4da63cfb05949bf493060858206d265aa1945a3e2dd8bbc73125e0b4a"
+    }
+  ],
+  "files": {
+    "cardputer-adv-factory.bin": {
+      "size": 1315344,
+      "sha256": "285250b5b04ffc122793f5aba0c4fe20e8f804a71146f86f941a47c56081377b"
+    },
+    "cardputer-adv-app.bin": {
+      "size": 1249808,
+      "sha256": "a5051ff4da63cfb05949bf493060858206d265aa1945a3e2dd8bbc73125e0b4a"
+    }
+  },
+  "hardware_validation": "pending"
+}
