@@ -9,7 +9,7 @@ These are real binaries committed to Git, built for **M5Stack Cardputer Advance 
 | [SHA256SUMS](SHA256SUMS) | SHA-256 checksums for both images and the manifest |
 | [manifest.json](manifest.json) | Source revision, build-input hashes, tools, image sizes and flash layout |
 
-Both images contain the same etag application. They install software on the **Cardputer**, not on an electronic tag. The workbench supports compatible IR display editing and wired CC2510 diagnostics; tag flash programming is still planned. See the [main README](../../../README.md) for capabilities and the [bench procedure](../../../docs/workflows/cardputer-validation.md) for physical validation.
+Both images contain the same etag application. They install software on the **Cardputer**, not on an electronic tag. The workbench supports compatible IR display editing, wired CC2510 diagnostics and an OpenEPaperLink AP client over Wi-Fi. Tag flash programming is still planned. See the [main README](../../../README.md) for capabilities, the [OEPL workflow](../../../docs/workflows/openepaperlink.md) for AP/SD setup, and the [bench procedure](../../../docs/workflows/cardputer-validation.md) for physical validation.
 
 ## Launcher: keep your launcher
 

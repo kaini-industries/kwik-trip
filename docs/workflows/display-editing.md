@@ -10,7 +10,7 @@ Keep normal tag battery power for infrared editing; there is no wired adapter in
 
 ## On the Cardputer
 
-The main menu is **1 IR devices**, **2 Wired diagnostics**, **3 Browser editor**.
+The main menu is **1 IR devices**, **2 Wired diagnostics**, **3 Browser editor**, **4 OpenEPaperLink**. This guide covers IR; see the separate [OpenEPaperLink workflow](openepaperlink.md) for AP-based delivery.
 
 1. Choose IR devices → Add target. Enter a valid 17-character barcode including its checksum. Confirm the detected model settings. Unknown models require explicit kind, size, orientation and color settings.
 2. Give it a name. The device stores up to nine records, and preserves names/settings across restart. A storage error is displayed; failed writes do not silently replace a saved record.

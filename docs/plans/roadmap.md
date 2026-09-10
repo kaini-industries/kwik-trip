@@ -9,6 +9,7 @@ The Cardputer application already exists, with keyboard/display controls, USB co
 | Workspace, pinned toolchains and reference organization | Implemented | Catalog validation, software tests and build matrix pass |
 | GPIO/USB/Cardputer diagnostic application | Implemented; bench validation pending | Keyboard, SD, idle pins and repeatable chip/status responses verified physically |
 | IR display editor and USB/BLE browser bridge | Implemented; bench validation pending | Saved device persistence, display content, cancellation and reconnect tested on a compatible physical tag |
+| OpenEPaperLink AP interoperability | Implemented; bench validation pending | Cardputer Wi-Fi, Studio and CLI submit exact-size images to a configured AP; registered tag and actual screen refresh checked physically |
 | Catalog the user's tag collection | Templates and two initial research profiles | One record per hardware revision, separate unit inventory, MCU/voltage/pad/panel evidence recorded |
 | Protocol dispatch and capabilities for additional MCU families | CC2510 probe only | Each new backend has explicit operations, suitable transport/pin configuration, simulated failure tests, and bench results |
 | Internal flash and information-page readout | Not implemented | Two matching reads, complete error/status handling, hash and provenance records |
@@ -19,6 +20,8 @@ The Cardputer application already exists, with keyboard/display controls, USB co
 | Keyed pogo fixture and multiple-unit workflow | Templates only | Repeated operation on a second confirmed revision |
 | Target-specific radio or NFC content delivery | Future | Compatible transport and hardware identified, working recovery, complete payload validation and staged updates |
 | OTA tag firmware | Future | Recoverable bootloader and tested power-loss behavior |
+
+OpenEPaperLink's [reviewed design and API](../reference/openepaperlink.md) now inform this roadmap. The current integration uses an existing AP for radio delivery and obtains runtime display metadata from it. Native RF, custom tag firmware, flashing and OTA are still separate work: identify actual hardware, choose the appropriate PHY/backend, then implement check-ins, versioned data, missing-part retries, bounded buffering, staged image validation and measured sleep behavior. Add firmware updates only with a recoverable bootloader and power-loss tests. Do not copy an OEPL binary onto an unlisted tag or treat a successful HTTP upload as hardware verification.
 
 After the Cardputer/IR bench checks, the next programming work is a bounded readout backend and acquisition workflow for the first confirmed MCU family. Keep readout/backup distinct from destructive programming. A CC2510 reader must refresh protection state correctly, restore memory selection on errors, preserve information-page data independently, and report transport failures rather than assuming debug lock. Other families need their own memory and protection rules.
 

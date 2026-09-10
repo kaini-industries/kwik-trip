@@ -18,3 +18,4 @@ backups/*
 !backups/README.md
 hardware/inventory/*.local.json
 profiles/local/
+**/oepl.local.json

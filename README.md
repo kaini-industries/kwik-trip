@@ -2,7 +2,7 @@
 
 A portable e-tag workbench built around the **M5Stack Cardputer Advance**, with support for other ESP32 development boards. The goal is to investigate, back up, and reprogram a collection of electronic tags using shared tools and a profile for each hardware revision.
 
-**This project already builds firmware for the Cardputer Advance.** It includes a **PP4/PP16 infrared display editor** with saved devices, text composition, SD images, and a browser editor over USB or Bluetooth. A separate diagnostics mode provides a **wired TI CC2510 identification/status probe** and SD logs. Reading or reprogramming tag firmware remains upcoming work.
+**This project already builds firmware for the Cardputer Advance.** It includes a **PP4/PP16 infrared display editor** with saved devices, text composition, SD images, and a browser editor over USB or Bluetooth. **OpenEPaperLink integration** adds image submission through an existing access point from the Cardputer over Wi-Fi, the browser Studio, or command-line tools. A separate diagnostics mode provides a **wired TI CC2510 identification/status probe** and SD logs. Reading or reprogramming tag firmware remains upcoming work.
 
 The project is organized to accommodate different manufacturers, MCU families, and displays. Compatibility is established per hardware revision and operation. The included tag records are initial research examples. No tag model has been physically validated with this firmware yet.
 
@@ -10,7 +10,7 @@ The project is organized to accommodate different manufacturers, MCU families, a
 
 | Component | Runs on | Purpose |
 | --- | --- | --- |
-| **Cardputer/ESP32 firmware** | Your Cardputer Advance or another configured ESP32 | Provides the user interface, sends display content over compatible infrared protocols, and probes CC2510 tags through a wired adapter |
+| **Cardputer/ESP32 firmware** | Your Cardputer Advance or another configured ESP32 | Provides the user interface, compatible IR updates, a Cardputer Wi-Fi client for OEPL APs, and wired CC2510 probing |
 | **Development tools** | Your computer | Build firmware, validate profiles, prepare image packages, and archive independently acquired backups |
 | **Tag firmware** | The electronic tag's own MCU | Controls its display, peripherals, and power management; built separately for that hardware |
 
@@ -28,9 +28,10 @@ The separate [CC2510 target project](firmware/targets/cc2510/README.md) is a com
 | Record additional tag models and revisions | Implemented through validated JSON profiles |
 | Package tag images and archive separately acquired dumps | Computer tools implemented; see [format limits](tools/README.md) |
 | Read, erase, program, and verify tag flash on the Cardputer | Planned; no commands implement these operations yet |
-| SWD, UART bootloader, SPI flash, radio, or NFC communication | No active implementations; some families can be recorded in profiles |
+| SWD, UART bootloader, SPI flash, direct tag radio, or NFC communication | No active implementations; OEPL radio delivery is delegated to an existing AP |
 | IR display updates, text editor, SD image library, saved devices | Implemented for compatible PP4/PP16 graphic tags; physical validation pending |
 | Browser editor over USB serial or BLE | Implemented; codec/upload tests pass; physical connection validation pending |
+| OpenEPaperLink AP client: tag list/status and JPEG submission | Implemented in Cardputer Wi-Fi mode, Studio and Python CLI; mock-tested, physical AP/tag validation pending |
 | Custom tag display drivers | Separate target firmware work; not implemented |
 
 Adding a profile records a device; it does not implement its protocol. See the [roadmap](docs/plans/roadmap.md) for the path from diagnostics to a portable programmer.
@@ -108,7 +109,7 @@ Download both binaries, [manifest.json](firmware/releases/cardputer-adv/manifest
 
 For an existing **standalone etag installation with the matching partition layout and booting app0**, you can preserve saved settings by flashing **cardputer-adv-app.bin at 0x10000**. This is not the Launcher procedure. Follow the [detailed installation guide](firmware/releases/cardputer-adv/README.md#standard-esp32-usb-flashing) for that update command and the full flash layout.
 
-After any installation method, the Cardputer should open the workbench menu: **1 IR devices**, **2 Wired diagnostics**, and **3 Browser editor**. Continue with [display editing](#edit-a-compatible-tag-display) or [wired diagnostics](#connect-a-tag-for-wired-diagnostics).
+After any installation method, the Cardputer should open the workbench menu: **1 IR devices**, **2 Wired diagnostics**, **3 Browser editor**, and **4 OpenEPaperLink**. Continue with [display editing](#edit-a-compatible-tag-display), [OpenEPaperLink](#use-an-openepaperlink-access-point), or [wired diagnostics](#connect-a-tag-for-wired-diagnostics).
 
 ### Build from source
 
@@ -129,7 +130,7 @@ Keep the tag disconnected while installing firmware on the **Cardputer**, and re
 .venv/bin/pio run -e cardputer-adv -t upload --upload-port /dev/cu.YOUR_DEVICE
 ```
 
-After boot, the Cardputer menu offers **1 IR devices**, **2 Wired diagnostics**, and **3 Browser editor**. Choose **2**, then type `help` for the keyboard or USB diagnostics console. Type `display` to return to the menu. For the optional computer console:
+After boot, the Cardputer menu offers **1 IR devices**, **2 Wired diagnostics**, **3 Browser editor**, and **4 OpenEPaperLink**. Choose **2**, then type `help` for the keyboard or USB diagnostics console. Type `display` to return to the menu. For the optional computer console:
 
 ```sh
 .venv/bin/pio device monitor --port /dev/cu.YOUR_DEVICE --baud 115200
@@ -150,6 +151,16 @@ Up to nine IR devices are saved on the Cardputer. These records describe address
 For the browser editor, run `make studio` on your computer and open [localhost:8000](http://localhost:8000). On the Cardputer choose **3 Browser editor → 1 USB serial** or **2 Bluetooth**, then select the same connection in the browser. USB is the recommended starting point. Bluetooth displays a six-digit pairing code on the Cardputer; enter it when the browser or operating system prompts. Prepare and preview artwork, push it to the Cardputer, then explicitly send it to the tag. Close the serial monitor before connecting the browser over USB.
 
 See the [display editing guide](docs/workflows/display-editing.md), [hardware test procedure](docs/workflows/cardputer-validation.md), and [TagTinker attribution](THIRD_PARTY_NOTICES.md).
+
+## Use an OpenEPaperLink access point
+
+An existing, configured **OpenEPaperLink AP and compatible tags** are required. This mode submits images to that AP; it does not emulate an SES/Vusion factory gateway or install tag firmware. Neither initial SES research profile is established as OEPL-compatible.
+
+- **Browser:** run `make studio`, open [localhost:8000](http://localhost:8000), and select **OEPL RF**. Enter the AP address, load its tags, select a destination, and prepare artwork from a file, text, or the existing Studio canvas. Review it, then send. The local Python bridge handles AP requests; no Cardputer connection is needed for this route.
+- **Cardputer:** copy [oepl.example.json](config/oepl.example.json) to `/etag/oepl.local.json` on microSD and fill in your Wi-Fi/AP settings. Put exact-sized baseline JPEGs in `/etag/images`, choose **4 OpenEPaperLink**, connect, select a tag and image, preview, and send. The Cardputer uses its built-in Wi-Fi; the AP provides the tag radio.
+- **CLI:** `.venv/bin/python tools/oepl.py tags --ap http://192.168.1.50`. The tool also provides `status` and `upload`; see the [workflow](docs/workflows/openepaperlink.md).
+
+Uploads require a registered MAC and valid dimensions reported by the AP. **AP accepted** does not confirm RF delivery or screen refresh; check tag status and the physical display. There is no automatic resend after an uncertain submission. Runtime AP records remain separate from hardware verification profiles. See the [source/API review](docs/reference/openepaperlink.md) for the pinned upstream contract and protocol lessons.
 
 ## Connect a tag for wired diagnostics
 

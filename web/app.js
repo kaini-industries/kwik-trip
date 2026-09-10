@@ -1564,6 +1564,7 @@
     const previousContentView = state.viewMode === 'view-plugins' ? 'plugins' : 'image';
     const nextContentView = viewId === 'view-plugins' ? 'plugins' : 'image';
     state.viewMode = viewId;
+    document.body.classList.toggle('oepl-view', viewId === 'view-oepl');
     if (previousContentView !== nextContentView) invalidateArtwork();
     document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active'));
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -1577,7 +1578,8 @@
     if (viewId !== 'view-tags') {
       stopCamera();
     }
-    renderActiveCanvas();
+    // Keep the visible Studio artwork available to copy into the independent RF editor.
+    if (viewId !== 'view-oepl') renderActiveCanvas();
   }
 
   function setupEvents() {

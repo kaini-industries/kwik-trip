@@ -34,7 +34,15 @@ def main():
                        cwd=ROOT, check=True)
         subprocess.run([allocation], cwd=ROOT, check=True)
         print("PASS: allocation", flush=True)
+        oepl = str(Path(directory) / "oepl")
+        subprocess.run(compiler + ["-std=c++17", "-Wall", "-Wextra", "-Werror", "-g",
+                         "-fsanitize=address,undefined", "-fno-omit-frame-pointer",
+                         f"-I{CORE}", "tests/oepl/core.cpp",
+                         str(CORE / "etag/oepl/Api.cpp"), "-o", oepl], cwd=ROOT, check=True)
+        subprocess.run([oepl], cwd=ROOT, check=True)
+        print("PASS: OEPL HTTP and image validation", flush=True)
     subprocess.run(["node", "tests/display/web.cjs"], cwd=ROOT, check=True)
+    subprocess.run(["node", "tests/display/oepl-web.cjs"], cwd=ROOT, check=True)
 
 if __name__ == "__main__":
     main()

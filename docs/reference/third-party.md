@@ -13,5 +13,6 @@ The implementation uses the public TI debug-interface specification and separate
 | [M5Unified](https://github.com/m5stack/M5Unified) / [M5GFX](https://github.com/m5stack/M5GFX) | Exact versions in host configuration |
 | [IRremote](https://github.com/Arduino-IRremote/Arduino-IRremote) | Pinned dependency required by M5Cardputer's package; unused by this application |
 | [PlatformIO MCS51 builder](https://github.com/platformio/platform-intel_mcs51) | Board size configuration and SDCC link settings |
+| [OpenEPaperLink](openepaperlink.md) | Reviewed `351e687f295dac2723194c80232d34a475e2078b`; independently implemented HTTP interoperability and future RF design research, no upstream code import |
 
-The saved M5Stack schematic is publisher reference material, not an etag-authored hardware design. Check each upstream license before distributing copied code or combining it into firmware. A project-wide license has not been chosen by the owner.
+The saved M5Stack schematic is publisher reference material, not an etag-authored hardware design. Check each upstream license before distributing copied code or combining it into firmware. Project code uses GPL-3.0-only; see [third-party notices](../../THIRD_PARTY_NOTICES.md) for provenance and exclusions.

@@ -13,6 +13,13 @@ The etag project source is licensed under GNU GPL version 3 only; see [LICENSE](
 
 The [import manifest](docs/reference/tagtinker-adv/import.json) records original source paths and hashes. The [upstream protocol notes](docs/reference/tagtinker-adv/protocol.md) retain the research context. Upstream credits [furrtek/PrecIR](https://github.com/furrtek/PrecIR) for the underlying infrared research. Neither upstream's compatibility reports nor its model table constitute physical validation of this fork.
 
+## OpenEPaperLink interoperability
+
+- Reference project: [OpenEPaperLink/OpenEPaperLink](https://github.com/OpenEPaperLink/OpenEPaperLink), reviewed at [`351e687f295dac2723194c80232d34a475e2078b`](https://github.com/OpenEPaperLink/OpenEPaperLink/tree/351e687f295dac2723194c80232d34a475e2078b).
+- Upstream license: CC BY-NC-SA 4.0. No upstream source, firmware, artwork or static tag-type catalog has been imported into this GPL project.
+- Independently authored GPL-3.0-only components: `lib/EtagCore/src/etag/oepl/`, `firmware/programmer/src/oepl/`, `tools/oepl.py`, `tools/studio.py`, and `web/oepl.js`, with their tests.
+- Use: HTTP API interoperability with an existing AP, and design research. Runtime metadata is read from the user's AP. API facts and limits are documented in the [source review](docs/reference/openepaperlink.md).
+
 ## Barcode scanner and build dependencies
 
 The bundled ZXing browser scanner retains its [Apache 2.0 license](web/vendor/ZXING-LICENSE). The M5Stack, Arduino, ESP-IDF, fonts, PlatformIO and test dependencies retain their own licenses and notices; they are resolved through the pinned build configuration. This notice does not replace their terms.

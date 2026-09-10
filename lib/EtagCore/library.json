@@ -1,7 +1,7 @@
 {
   "name": "EtagCore",
-  "version": "0.2.0",
-  "description": "Portable wired diagnostics and PP4/PP16 display protocols",
+  "version": "0.3.0",
+  "description": "Portable wired diagnostics, PP4/PP16 display protocols and OEPL HTTP interoperability",
   "build": {
     "includeDir": "src"
   },

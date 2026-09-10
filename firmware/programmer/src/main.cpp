@@ -105,7 +105,7 @@ void command(String line) {
         report("IR display editor requires Cardputer Advance.");
 #endif
     } else if (line == "about") {
-        report(String("etag 0.2.0 / ") + kHostName);
+        report(String("etag 0.3.0 / ") + kHostName);
         report("Read-only probe scaffold. No hardware validation claimed.");
     } else if (line == "pins") {
         report("DD=" + String(kDD) + " DC=" + String(kDC) + " RESET=" + String(kReset));
