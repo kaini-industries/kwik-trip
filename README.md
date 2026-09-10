@@ -44,7 +44,71 @@ Adding a profile records a device; it does not implement its protocol. See the [
 | **M5Burner 3** or **standard ESP32 USB flashing** | [cardputer-adv-factory.bin](firmware/releases/cardputer-adv/cardputer-adv-factory.bin), complete image at **0x0** |
 | **bmorcelli/Launcher**, through its SD browser or WebUI | [cardputer-adv-app.bin](firmware/releases/cardputer-adv/cardputer-adv-app.bin), application only; Launcher chooses its partition |
 
-On GitHub, open the file and select **Download raw file**. Follow the [installation guide](firmware/releases/cardputer-adv/README.md) for checksums, M5Burner's account-based upload workflow, Launcher, and esptool commands. Factory USB installation replaces an existing Launcher setup and clears saved Cardputer settings. Physical validation is pending.
+On GitHub, open the file and select **Download raw file**. These images are for the **Cardputer Advance**, not the electronic tags or the original Cardputer. Build and image-format checks pass; physical validation is pending.
+
+**Choose one installation method below.** Factory USB installation replaces an existing Launcher setup and clears saved Cardputer settings, including saved etag devices. To keep Launcher, install the application through Launcher itself. Keep tag wiring disconnected while installing host firmware.
+
+### Flash with Launcher
+
+1. Start with [bmorcelli/Launcher](https://github.com/bmorcelli/Launcher) installed on your Cardputer Advance, using a release that supports the Advance keyboard.
+2. Download **cardputer-adv-app.bin** from the table above and copy it to a FAT32 microSD card, for example `/firmware/cardputer-adv-app.bin`.
+3. Insert the card, restart the Cardputer and press **Enter** at Launcher's startup screen to open its menu.
+4. Open **SD**, select the `.bin` and choose **Install**. Let Launcher select/create the destination partition, then boot the installed application.
+
+Alternatively, open Launcher's **WUI**, visit the address it displays, and use its firmware/OTA upload to select **cardputer-adv-app.bin**. No separate filesystem image is needed. Return to Launcher using its startup selection screen.
+
+Do not write the app directly to `0x10000` with a USB flashing tool on a Launcher installation; Launcher manages its own partition layout. For this private GitHub repository, download while signed in, then use SD or WebUI rather than an anonymous online download link.
+
+### Flash with M5Burner 3
+
+M5Burner 3 uses an account-based custom-firmware upload workflow. The factory image is ready for that workflow; it is not already published in M5Burner's catalog.
+
+1. Download **cardputer-adv-factory.bin** from the table above. Connect the Cardputer Advance with a USB data cable and close any serial monitor.
+2. Sign into M5Burner with your M5Stack community account, then open **USER CUSTOM → Publish**.
+3. Select the factory file under **FirmWare**. Fill in the name, version, description, device type, GitHub URL and cover as prompted, then click **Upload**. Use a name such as **etag — Cardputer Advance**, select **Cardputer ADV** when listed, and use the `source_commit` from [manifest.json](firmware/releases/cardputer-adv/manifest.json) as the version identifier.
+4. Use the uploaded entry's **Share** action to obtain a **Share Code**, then open **Share Burn**. Select the Cardputer's USB port, choose baud **460800** and start the burn. Restart the Cardputer when it finishes.
+
+M5Burner writes this complete image at **0x0**. Do not select the app-only image for this route. [M5Stack's publishing guide](https://docs.m5stack.com/en/uiflow/m5burner/publish) explains the upload, publicity and sharing controls. To flash locally without uploading to M5Stack's service, use esptool below.
+
+### Flash over USB with esptool
+
+Download **cardputer-adv-factory.bin** into a folder and open a terminal in that folder. With Python **3.12** installed, set up the pinned flashing tool and list available serial ports.
+
+**macOS / Linux:**
+
+```sh
+python3.12 -m venv .venv
+.venv/bin/python -m pip install esptool==4.9.0
+.venv/bin/python -m serial.tools.list_ports
+```
+
+Connect with a USB data cable, close any serial monitor, and replace `/dev/cu.YOUR_DEVICE` with the port from that list. Linux ports commonly look like `/dev/ttyACM0`.
+
+```sh
+.venv/bin/python -m esptool --chip esp32s3 --port /dev/cu.YOUR_DEVICE --baud 460800 write_flash 0x0 cardputer-adv-factory.bin
+```
+
+**Windows PowerShell:**
+
+```powershell
+py -3.12 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install esptool==4.9.0
+.\.venv\Scripts\python.exe -m serial.tools.list_ports
+# Replace COM5 with the Cardputer's port from the list.
+.\.venv\Scripts\python.exe -m esptool --chip esp32s3 --port COM5 --baud 460800 write_flash 0x0 cardputer-adv-factory.bin
+```
+
+Wait for successful write verification, then restart the Cardputer. The factory image includes the bootloader, partition table, initial OTA data and application; no additional `.bin` files or separate full-chip erase are needed. Other ESP32 flash tools should use **ESP32-S3**, address **0x0**, **8 MB flash**, and preserve the image's **DIO / 80 MHz** settings. The commands above use esptool 4.9.0; esptool 5 calls the operation `write-flash`.
+
+If the port is missing or the connection fails, check the data cable and close programs using that port. To enter download mode manually, hold the Stamp's **G0** button while connecting USB, release it, then retry. Lower the baud to **115200** if transfers fail. See [M5Stack's Cardputer Advance guide](https://docs.m5stack.com/en/core/Cardputer-Adv) for download mode.
+
+### Verify downloads and update an existing installation
+
+Download both binaries, [manifest.json](firmware/releases/cardputer-adv/manifest.json) and [SHA256SUMS](firmware/releases/cardputer-adv/SHA256SUMS) into the same folder. Before flashing, run `shasum -a 256 -c SHA256SUMS` on macOS or `sha256sum -c SHA256SUMS` on Linux. On Windows, compare `Get-FileHash .\cardputer-adv-factory.bin -Algorithm SHA256` with its entry in `SHA256SUMS` (substitute the app filename for a Launcher install).
+
+For an existing **standalone etag installation with the matching partition layout and booting app0**, you can preserve saved settings by flashing **cardputer-adv-app.bin at 0x10000**. This is not the Launcher procedure. Follow the [detailed installation guide](firmware/releases/cardputer-adv/README.md#standard-esp32-usb-flashing) for that update command and the full flash layout.
+
+After any installation method, the Cardputer should open the workbench menu: **1 IR devices**, **2 Wired diagnostics**, and **3 Browser editor**. Continue with [display editing](#edit-a-compatible-tag-display) or [wired diagnostics](#connect-a-tag-for-wired-diagnostics).
 
 ### Build from source
 
