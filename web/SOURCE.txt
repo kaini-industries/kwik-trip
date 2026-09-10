@@ -4,3 +4,9 @@ Modified 2026-09-10 for etag: https://github.com/kaini-industries/kwik-trip
 Corresponding source is included with this project, in web/, firmware/programmer/src/display/, and lib/EtagCore/src/etag/display/.
 Do not publish a binary/web distribution without making its corresponding source available to its recipients.
 Bundled ZXing: Apache-2.0; see vendor/ZXING-LICENSE.
+
+OpenEPaperLink integration (web/oepl.js): original etag GPL-3.0-only code,
+using the OpenEPaperLink access-point HTTP API through tools/studio.py.
+No OpenEPaperLink firmware or assets are bundled in this web editor.
+Upstream protocol and compatibility references are recorded in the project's
+docs/reference/openepaperlink.md documentation.

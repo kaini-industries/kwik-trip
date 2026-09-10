@@ -117,9 +117,10 @@ render::TextColor nextTextColor(const target::Color palette, const render::TextC
 
 } // namespace
 
-const std::array<App::MenuItem, 2> App::menuItems_{{
+const std::array<App::MenuItem, 3> App::menuItems_{{
     {'1', "IR devices", Screen::target},
     {'3', "Browser editor", Screen::webTransport},
+    {'4', "OpenEPaperLink", Screen::oepl},
 }};
 
 const std::array<App::MenuItem, 3> App::broadcastItems_{{
@@ -149,6 +150,12 @@ void App::resume() {
 
 void App::update() {
   M5Cardputer.update();
+
+  if (screen_ == Screen::oepl) {
+    oepl_.update();
+    if (oepl_.exitRequested()) open(Screen::mainMenu);
+    return;
+  }
 
   if (screen_ == Screen::splash) {
     const bool keyPressed = M5Cardputer.Keyboard.isChange() && M5Cardputer.Keyboard.isPressed();
@@ -251,6 +258,7 @@ void App::update() {
     }
     break;
   case Screen::webUi:
+  case Screen::oepl:
     break;
   case Screen::splash:
   case Screen::sending:
@@ -354,6 +362,12 @@ void App::open(const Screen screen) {
     break;
   case Screen::webUi:
     drawWebUi();
+    break;
+  case Screen::oepl:
+    // This mode owns the shared canvas/SD until its network worker stops.
+    imageData_ = {};
+    bleBridge_.clearStaged();
+    oepl_.begin();
     break;
   }
 }
@@ -1148,7 +1162,7 @@ void App::drawSplash() {
 
   canvas_.setTextDatum(middle_center);
   canvas_.setTextColor(theme::text, theme::background);
-  canvas_.drawString("Infrared shelf labels", screenWidth / 2, 87);
+  canvas_.drawString("Electronic tag workbench", screenWidth / 2, 87);
 
   present();
 }
@@ -1157,10 +1171,11 @@ void App::drawMainMenu() {
   canvas_.fillScreen(theme::background);
   drawHeader("etag / Cardputer ADV");
 
-  drawMenuItem(menuItems_[0], 44);
-  drawMenuLine('2', "Wired diagnostics", 64);
-  drawMenuItem(menuItems_[1], 84);
-  drawFooter("1-3 Select");
+  drawMenuItem(menuItems_[0], 35);
+  drawMenuLine('2', "Wired diagnostics", 55);
+  drawMenuItem(menuItems_[1], 75);
+  drawMenuItem(menuItems_[2], 95);
+  drawFooter("1-4 Select");
 
   present();
 }

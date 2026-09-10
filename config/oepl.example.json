@@ -1,0 +1,6 @@
+{
+  "schema_version": 1,
+  "ssid": "YOUR_WIFI_NETWORK",
+  "password": "YOUR_WIFI_PASSWORD",
+  "ap": "http://192.168.1.50"
+}

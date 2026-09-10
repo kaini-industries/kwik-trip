@@ -31,4 +31,4 @@ When adding erase/program, implement exclusive operation ownership, complete pac
 
 Update versions in PlatformIO configs together with the affected build matrix. Python requirements are constrained by `requirements-lock.txt`. Recreate the virtual environment and freeze a reviewed dependency set when updating it. Do not use floating platform URLs or copy old networking libraries into `lib/`.
 
-No project-wide distribution license has been selected. Keep upstream attribution and check licenses before importing code; see [third-party references](docs/reference/third-party.md).
+Project code uses GPL-3.0-only. Keep upstream attribution and check licenses before importing code; see [third-party notices](THIRD_PARTY_NOTICES.md). The OEPL integration is independently implemented API interoperability, not an import of its CC BY-NC-SA source. Add mock HTTP/browser regressions for AP contract or workflow changes; no test may submit to an actual gateway.

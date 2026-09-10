@@ -31,7 +31,7 @@ upload_port = /dev/cu.YOUR_DEVICE
 monitor_port = /dev/cu.YOUR_DEVICE
 ```
 
-The ordered `extra_configs` list loads this optional file after the committed definitions, so overrides do not depend on filesystem enumeration order. Keep the same environment name and board/pin profile; new boards get new committed environments. There is no Wi-Fi service; the browser editor connects over USB or BLE.
+The ordered `extra_configs` list loads this optional file after the committed definitions, so overrides do not depend on filesystem enumeration order. Keep the same environment name and board/pin profile; new boards get new committed environments. The Cardputer's browser bridge uses USB/BLE; its OpenEPaperLink mode uses Wi-Fi as an AP client. Wi-Fi settings live in ignored `/etag/oepl.local.json` on SD, never in build flags or committed firmware inputs.
 
 `make validate` is the broad check. Use `make test`, `make build-hosts`, or `make build-tag` while iterating. Build/test never uploads firmware. The CC2510 pre-build script rejects upload targets even if requested, because the generic serial uploader does not speak TI debug.
 
@@ -54,7 +54,9 @@ The [GitHub Actions workflow](../.github/workflows/ci.yml) first validates the c
 
 Artifact uploads explicitly include the selected files inside `.pio` and fail if no outputs are found. The `programmer-*` artifacts contain application binaries/debug ELFs; `cardputer-adv-flashable` additionally contains complete factory and Launcher application images with checksums and a manifest. The CC2510 artifact contains diagnostic HEX/map files. The [committed Cardputer downloads](../firmware/releases/cardputer-adv/README.md) remain available directly in Git even when Actions artifacts expire. CI success establishes software/build compatibility; physical tag support is recorded separately.
 
-`tools/test_display.py` compiles the imported frame/codec/waveform suites and persistence/input-boundary integration tests with AddressSanitizer and UBSan, then runs the browser codec and upload tests. Use macOS/Linux (or WSL) with a C++17 compiler for this sanitizer suite. It is part of `make validate` and CI. `make studio` serves `web/` on localhost only, without credentials or external hosting.
+`tools/test_display.py` compiles the imported frame/codec/waveform suites, persistence/input-boundary integration tests and independently authored OEPL HTTP core tests with AddressSanitizer and UBSan, then runs both browser suites. Use macOS/Linux (or WSL) with a C++17 compiler for this sanitizer suite. It is part of `make validate` and CI. Python tests include mock loopback APs, so the test process needs permission to bind local ephemeral ports.
+
+`make studio` runs `tools/studio.py`, serving `web/` and its same-origin OEPL JSON bridge on loopback only. It does not launch a browser or contact an AP until explicitly requested from the UI. A generic static server still serves the USB/BLE editor but cannot provide the OEPL bridge. See the [OEPL workflow](workflows/openepaperlink.md) and [reviewed upstream contract](reference/openepaperlink.md). No new third-party dependency was added for this integration.
 
 ## Refresh the committed Cardputer binaries
 

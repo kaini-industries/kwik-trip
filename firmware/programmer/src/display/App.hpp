@@ -10,6 +10,7 @@
 #include <etag/display/TargetProtocol.hpp>
 #include "TargetRenderer.hpp"
 #include "TargetStore.hpp"
+#include "../oepl/OeplMode.hpp"
 
 #include <M5Cardputer.h>
 #include <M5GFX.h>
@@ -48,6 +49,7 @@ enum class Screen : std::uint8_t {
   targetRemove,
   webTransport,
   webUi,
+  oepl,
 };
 
 class App final {
@@ -67,13 +69,14 @@ private:
   };
 
   static constexpr std::uint32_t splashDurationMs = 1250;
-  static const std::array<MenuItem, 2> menuItems_;
+  static const std::array<MenuItem, 3> menuItems_;
   static const std::array<MenuItem, 3> broadcastItems_;
 
   bool initialized_ = false;
   bool consoleRequested_ = false;
   bool useBluetooth_ = false;
   M5Canvas canvas_;
+  etag_host::OeplMode oepl_{canvas_};
   InfraredTransmitter transmitter_;
   TargetStore targets_;
   ImageLibrary images_;

@@ -357,6 +357,26 @@
     .view-panel.active {
       display: flex;
     }
+    body.oepl-view .ir-editor { display: none; }
+    body.oepl-view #btn-header-connect { display: none; }
+    .oepl-details { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 16px; }
+    .oepl-details dt { color: var(--text-muted); font-size: 11px; }
+    .oepl-details dd { overflow-wrap: anywhere; }
+    .oepl-preview { background: #151515; padding: 16px; display: flex; justify-content: center; }
+    #oepl-canvas { max-width: 100%; height: auto; object-fit: contain; background: #fff; image-rendering: pixelated; }
+    #oepl-status { white-space: pre-wrap; overflow-wrap: anywhere; min-height: 3em; }
+    #oepl-status[data-error="true"] { color: #fca5a5; }
+    #oepl-text { min-height: 72px; padding: 10px; resize: vertical; }
+    .oepl-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    .oepl-actions .btn { flex: 1; min-width: 130px; }
+    #view-oepl button:disabled { opacity: 0.5; cursor: not-allowed; }
+    #view-oepl :focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
+    #oepl-progress { width: 100%; accent-color: var(--accent-green); }
+    @media (max-width: 480px) {
+      .tab-bar { flex-wrap: wrap; }
+      .tab-btn { min-width: 28%; min-height: 40px; }
+      #view-oepl .input-row { flex-wrap: wrap; }
+    }
     .card {
       background: var(--card-bg);
       border: 1px solid var(--card-border);
@@ -721,7 +741,7 @@
   </header>
 
   <main>
-    <div class="tag-hero-bar">
+    <div class="tag-hero-bar ir-editor">
       <div class="tag-select-wrapper">
         <select class="tag-select" id="header-target-select">
           <option value="">Loading tags…</option>
@@ -732,7 +752,7 @@
         <span>💡</span> BLINK
       </button>
     </div>
-    <div class="screen-stage">
+    <div class="screen-stage ir-editor">
       <div class="screen-bezel">
         <canvas id="esl-canvas" width="296" height="152"></canvas>
       </div>
@@ -744,7 +764,7 @@
         <div style="font-family: var(--font-mono); font-size: 11px; color: #888888;" id="hud-percent">0%</div>
       </div>
     </div>
-    <button class="btn-push" id="btn-send-esl">
+    <button class="btn-push ir-editor" id="btn-send-esl">
       <span>📥</span> PUSH TO CARDPUTER
     </button>
     <div class="tab-bar">
@@ -760,6 +780,7 @@
       <button class="tab-btn" data-view="view-connect">
         <span>⚙️</span> CONNECT
       </button>
+      <button class="tab-btn" data-view="view-oepl">OEPL RF</button>
     </div>
     <section id="view-image" class="view-panel active">
       <div class="card">
@@ -946,6 +967,54 @@
         </div>
       </div>
     </section>
+    <section id="view-oepl" class="view-panel" aria-label="OpenEPaperLink">
+      <div class="card">
+        <div class="card-title">OPENEPAPERLINK</div>
+        <p class="card-subtitle">Send artwork through your OpenEPaperLink access point to tags running compatible firmware. Factory SES/Vusion support is not established.</p>
+        <div class="form-group">
+          <label class="form-label" for="oepl-ap">ACCESS POINT ADDRESS</label>
+          <div class="input-row">
+            <input id="oepl-ap" class="input-text" type="url" placeholder="http://192.168.1.50" autocomplete="off" spellcheck="false">
+            <button id="oepl-connect" class="btn btn-secondary">LOAD TAGS</button>
+          </div>
+          <p class="card-subtitle" style="margin-top: 0;">Start this editor with <code>make studio</code> for the local connection bridge. AP addresses and tag lists stay in this session.</p>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="oepl-tag">TAG REPORTED BY THE ACCESS POINT</label>
+          <select id="oepl-tag" class="select-styled" disabled><option value="">Load tags to choose a destination</option></select>
+        </div>
+        <dl id="oepl-details" class="oepl-details"></dl>
+        <button id="oepl-refresh" class="btn btn-secondary" disabled>REFRESH TAG STATUS</button>
+      </div>
+      <div class="card">
+        <div class="card-title">ARTWORK</div>
+        <div class="oepl-actions">
+          <button id="oepl-copy" class="btn btn-secondary">USE CURRENT STUDIO ARTWORK</button>
+          <button id="oepl-choose" class="btn btn-secondary">CHOOSE IMAGE</button>
+        </div>
+        <input id="oepl-file" type="file" accept="image/png,image/jpeg,image/webp,image/bmp" hidden>
+        <div class="form-group">
+          <label class="form-label" for="oepl-text">OR WRITE A MESSAGE</label>
+          <textarea id="oepl-text" class="input-text" maxlength="500" placeholder="A message for your display"></textarea>
+          <button id="oepl-use-text" class="btn btn-secondary">USE MESSAGE</button>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="oepl-fit">IMAGE FIT</label>
+          <select id="oepl-fit" class="select-styled"><option value="contain">Fit whole image</option><option value="cover">Fill display (crop edges)</option><option value="stretch">Stretch to display</option></select>
+        </div>
+        <div class="oepl-preview"><canvas id="oepl-canvas" width="296" height="128" aria-label="Artwork preview"></canvas></div>
+        <p id="oepl-preview-label" class="card-subtitle" style="margin-top: 0;">Choose a tag with known dimensions to prepare an image.</p>
+        <label><input id="oepl-dither" type="checkbox" checked> Let the access point dither the image for the tag's colors</label>
+        <div class="oepl-actions">
+          <button id="oepl-send" class="btn btn-primary" disabled>SEND IMAGE</button>
+          <button id="oepl-save" class="btn btn-secondary" disabled>SAVE JPEG FOR SD</button>
+        </div>
+        <p class="card-subtitle" style="margin-top: 0;">Save a JPEG for the Cardputer's <code>/etag/images</code> folder, up to 512 KiB. Saving downloads the artwork without sending it to the AP.</p>
+        <progress id="oepl-progress" hidden aria-label="OpenEPaperLink request in progress"></progress>
+        <p id="oepl-status" role="status" aria-live="polite">Load tags from your OpenEPaperLink access point to begin.</p>
+        <p class="card-subtitle" style="margin-top: 0;">The preview shows the uploaded artwork. The AP converts it to the tag's palette. An accepted upload means queued work, not a confirmed display refresh.</p>
+      </div>
+    </section>
     <section id="view-connect" class="view-panel">
       <div class="card">
         <div class="card-title">WIRELESS & WIRED LINK</div>
@@ -987,6 +1056,7 @@
 
   <script src="vendor/zxing.min.js"></script>
   <script src="app.js"></script>
-<footer style="padding:16px;text-align:center;font-size:12px">IR content updates for compatible PP4/PP16 tags. Transmission is not an acknowledgement.<br>Adapted from <a href="https://github.com/i12bp8/tagtinker-adv">TagTinker ADV</a> · <a href="LICENSE.txt">GPL-3.0-only</a> · <a href="SOURCE.txt">Source and notices</a></footer>
+  <script src="oepl.js"></script>
+<footer style="display:block;padding:16px;text-align:center;font-size:12px;color:var(--text-muted)">IR content updates for compatible PP4/PP16 tags. Transmission is not an acknowledgement.<br>OEPL uploads require a compatible access point and tag firmware.<br>Adapted from <a href="https://github.com/i12bp8/tagtinker-adv">TagTinker ADV</a> · <a href="LICENSE.txt">GPL-3.0-only</a> · <a href="SOURCE.txt">Source and notices</a></footer>
 </body>
 </html>

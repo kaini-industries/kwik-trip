@@ -11,7 +11,7 @@ test: check
 test-display:
 	$(PYTHON) tools/test_display.py
 studio:
-	$(PYTHON) -m http.server 8000 --bind 127.0.0.1 --directory web
+	$(PYTHON) tools/studio.py
 build:
 	$(PIO) run -e cardputer-adv
 package-cardputer:

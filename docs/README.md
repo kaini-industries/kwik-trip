@@ -12,3 +12,5 @@ Begin with the root [Cardputer quickstart](../README.md#start-with-the-cardputer
 
 - [Display editing](workflows/display-editing.md): IR devices, text, SD images and browser workflows.
 - [Cardputer validation](workflows/cardputer-validation.md): reproducible software checks and pending bench tests.
+- [OpenEPaperLink workflow](workflows/openepaperlink.md): Cardputer Wi-Fi, browser Studio and CLI image delivery through an existing AP.
+- [OpenEPaperLink source/API reference](reference/openepaperlink.md): pinned contract, provenance, completion semantics and future radio lessons.
