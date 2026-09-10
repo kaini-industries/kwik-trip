@@ -45,3 +45,7 @@ pio run -d firmware/targets/cc2510
 The root project creates firmware for the Cardputer/ESP32. The final command creates the separate tag diagnostic image. See [the application guide](../firmware/programmer/README.md) and [target projects](../firmware/targets/README.md) for their distinct roles.
 
 A successful ESP32 compile checks toolchain/library compatibility, not keyboard, SD, voltage, reset timing, or tag communication. Record physical validation in the per-host and per-tag hardware notes. CI artifacts distinguish `programmer-*` binaries from `cc2510f32-smoke-compile-only` HEX files.
+
+The [GitHub Actions workflow](../.github/workflows/ci.yml) first validates the catalog and runs Python/native tests, then builds all three ESP32 hosts and the independent CC2510 example. It never uploads to connected devices. Python is selected from `.python-version`; the pip cache explicitly hashes both `requirements-dev.txt` and `requirements-lock.txt`, since the default cache lookup expects a differently named requirements file. The actions use pinned release commits with the Node 24 runtime.
+
+Artifact uploads explicitly include the selected files inside `.pio` and fail if no outputs are found. They contain ESP32 application binaries/debug ELFs or CC2510 diagnostic HEX/map files, rather than a complete installation bundle. Use PlatformIO's local upload command for the ESP32 bootloader and partition offsets. CI success establishes software/build compatibility; physical tag support is recorded separately.
