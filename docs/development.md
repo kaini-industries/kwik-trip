@@ -4,10 +4,10 @@ Use the project-local Python 3.12 virtual environment. A global PlatformIO insta
 
 | Component | Pin |
 | --- | --- |
-| PlatformIO Core | 6.1.19 |
+| PlatformIO Core | 6.2.0 |
 | Espressif platform | 6.12.0 |
 | Arduino ESP32 framework package | 3.20017.241212 (Arduino 2.0.17) |
-| ESP image tool and Python dependencies | esptool 4.9.0, constrained requirements |
+| ESP image tool and Python dependencies | esptool 5.4.0, constrained requirements |
 | M5Cardputer | commit `2d4fa6646e4e5b47e0af96214b003aa7b15b8d81` (upstream tag 1.2.0; manifest still reports 1.1.1) |
 | M5Unified / M5GFX | 0.2.21 / 0.2.28 |
 | Display protocol source | TagTinker ADV commit `fb8a0669bbdfe77c51bdbd5adbb8cb2ab00f2db2`, adapted locally |
@@ -15,7 +15,7 @@ Use the project-local Python 3.12 virtual environment. A global PlatformIO insta
 | Native platform / Unity | 1.2.1 / 2.6.1 |
 | Intel MCS51 platform / SDCC package | 2.2.0 / 1.40100.12072 (SDCC 4.1.0, revision 12072) |
 
-PlatformIO's ESP image generator imports Python dependencies such as `intelhex`; these are supplied by the pinned `esptool` requirement, including when the global package cache was populated by a different interpreter. The PlatformIO cache is shared by default; source, build outputs and virtual environment are local. No global package files need manual editing.
+PlatformIO's ESP image generator imports Python dependencies such as `intelhex`; these are supplied by the pinned `esptool` requirement, including when the global package cache was populated by a different interpreter. Platform and tool packages use PlatformIO's user cache; compiled objects and build outputs stay under this checkout's ignored `.pio/` directory. The project-local build cache also keeps SCons' signature database outside the per-environment directory so dependency discovery cannot remove it during a build. No global package files need manual editing.
 
 The CC2510 example pins the same SDCC release on Linux x86_64, macOS, and Windows. The registry's newer `1.40400.0` package has no Linux distribution, so a build using that pin can pass on macOS and fail before compilation on GitHub's Linux runner. Check the [official package's platform coverage](https://registry.platformio.org/tools/platformio/toolchain-sdcc) before changing it; a newer package number alone does not establish cross-platform availability.
 
@@ -67,6 +67,6 @@ Artifact uploads explicitly include the selected files inside `.pio` and fail if
 
 On Windows with the virtual environment activated, the equivalent commands are `pio run -e cardputer-adv -t clean`, `pio run -e cardputer-adv -t package`, `python tools/cardputer_release.py publish`, and `python tools/cardputer_release.py verify`. The `publish` subcommand only copies files into this checkout; it makes no network requests.
 
-Build-input fingerprints cover application/core sources, host/tag metadata, dependency locks, PlatformIO configuration and packaging hooks. Documentation-only edits do not force a rebuild. For offline integrity/source checks use `make verify-release`; no PlatformIO build cache is needed. Image verification uses pinned esptool 4.9.0's parser and explicitly checks its checksum and digest results. Tests exercise corrupted images, wrong offsets and stale source detection.
+Build-input fingerprints cover application/core sources, host/tag metadata, dependency locks, PlatformIO configuration and packaging hooks. Documentation-only edits do not force a rebuild. For offline integrity/source checks use `make verify-release`; no PlatformIO build cache is needed. Image verification uses pinned esptool 5.4.0's parser and explicitly checks its checksum and digest results. Tests exercise corrupted images, wrong offsets, canonical release metadata, exact image merging and stale source detection.
 
 The factory image must stay compatible with M5Burner 3 and zero-offset ESP32 flashing. The separate app image must remain suitable for Launcher's SD/WebUI installer without replacing its bootloader or hard-coding its app partition. Review the [installation guide](../firmware/releases/cardputer-adv/README.md) whenever the partition scheme or hardware changes.

@@ -2,7 +2,6 @@
 import argparse
 import hashlib
 import importlib.metadata
-import io
 import json
 from pathlib import Path
 import shutil
@@ -20,6 +19,16 @@ SETTINGS = {"chip": "esp32s3", "board": "m5stack-stamps3", "flash_size": "8MB",
             "flash_mode": "dio", "flash_freq": "80m"}
 # Distribution contract: changing the layout requires reviewing all flashing instructions.
 OFFSETS = (0x0, 0x8000, 0xE000, 0x10000)
+ESPTOOL_VERSION = "5.4.0"
+SOURCE_FILES = (
+    ".python-version", "platformio.ini", "requirements-dev.txt", "requirements-lock.txt",
+    "config/hosts.json", "tools/pio_prepare.py", "tools/etaglib.py",
+    "tools/pio_release.py", "tools/cardputer_release.py",
+)
+SOURCE_DIRECTORIES = (
+    "firmware/programmer/src", "firmware/programmer/include", "lib",
+    "profiles/tags", "config/platformio",
+)
 
 
 def require(condition, message):
@@ -31,15 +40,27 @@ def sha(data):
     return hashlib.sha256(data).hexdigest()
 
 
+def write_utf8_lf(path, text):
+    """Write release metadata without host newline or locale conversion."""
+    require("\r" not in text, f"{path.name} contains non-canonical line endings")
+    path.write_bytes(text.encode("utf-8"))
+
+
+def read_utf8_lf(path):
+    """Read metadata only when its checked bytes are canonical UTF-8/LF."""
+    data = path.read_bytes()
+    require(not data.startswith(b"\xef\xbb\xbf") and b"\r" not in data,
+            f"{path.name} must use UTF-8 without BOM and LF line endings")
+    try:
+        return data.decode("utf-8")
+    except UnicodeDecodeError as error:
+        raise ValueError(f"{path.name} must use UTF-8") from error
+
+
 def source_inputs(root):
     """Hash build inputs, including new/deleted files, independently of build timestamps."""
-    paths = {root / p for p in (
-        ".python-version", "platformio.ini", "requirements-dev.txt", "requirements-lock.txt",
-        "config/hosts.json", "tools/pio_prepare.py", "tools/etaglib.py",
-        "tools/pio_release.py", "tools/cardputer_release.py",
-    )}
-    for directory in ("firmware/programmer/src", "firmware/programmer/include", "lib",
-                      "profiles/tags", "config/platformio"):
+    paths = {root / path for path in SOURCE_FILES}
+    for directory in SOURCE_DIRECTORIES:
         paths.update(p for p in (root / directory).rglob("*")
                      if p.is_file() and p.suffix not in (".md", ".pyc")
                      and not any(part.startswith(".") for part in p.relative_to(root).parts)
@@ -47,11 +68,42 @@ def source_inputs(root):
     return {p.relative_to(root).as_posix(): sha(p.read_bytes()) for p in sorted(paths)}
 
 
+def is_source_input_path(path):
+    """Apply the source manifest exclusions to a current or deleted Git path."""
+    relative = Path(path)
+    normalized = relative.as_posix()
+    if normalized in SOURCE_FILES:
+        return True
+    if relative.suffix in (".md", ".pyc") or relative.name == "local.ini" or any(
+            part.startswith(".") for part in relative.parts):
+        return False
+    return any(normalized == directory or normalized.startswith(directory + "/")
+               for directory in SOURCE_DIRECTORIES)
+
+
+def changed_source_inputs(root):
+    """Return modified, added, deleted, and untracked build inputs relative to HEAD."""
+    pathspecs = (*SOURCE_FILES, *SOURCE_DIRECTORIES)
+    tracked = subprocess.check_output(
+        ["git", "diff", "--no-renames", "--name-only", "-z", "HEAD", "--", *pathspecs],
+        cwd=root,
+    )
+    untracked = subprocess.check_output(
+        ["git", "ls-files", "--others", "-z", "--", *pathspecs], cwd=root)
+    paths = {
+        path.decode("utf-8", errors="surrogateescape")
+        for path in (tracked + untracked).split(b"\0") if path
+    }
+    return tuple(sorted(path for path in paths if is_source_input_path(path)))
+
+
 def validate_esp_image(data):
     # The pinned esptool loader parses segments, but digest/checksum mismatches
     # are only printed by its CLI. Explicit comparisons make CI fail on corruption.
     from esptool.bin_image import LoadFirmwareImage
-    image = LoadFirmwareImage("esp32s3", io.BytesIO(data))
+    # esptool 5's public ImageSource API accepts bytes directly. Passing a bare
+    # BytesIO is ambiguous with named file inputs in parts of the v5 toolchain.
+    image = LoadFirmwareImage("esp32s3", data)
     require(image.chip_id == 9, "Image is not for ESP32-S3")
     require(image.checksum == image.calculate_checksum(), "ESP image checksum mismatch")
     require(image.append_digest and image.stored_digest == image.calc_digest,
@@ -100,7 +152,7 @@ def validate_factory(factory, app, components):
 
 
 def verify(directory, root=ROOT):
-    manifest = json.loads((directory / "manifest.json").read_text())
+    manifest = json.loads(read_utf8_lf(directory / "manifest.json"))
     require(manifest["schema_version"] == 1 and manifest["settings"] == SETTINGS,
             "Unexpected release target/settings")
     require(manifest["source_inputs"] == source_inputs(root),
@@ -112,31 +164,36 @@ def verify(directory, root=ROOT):
         if name != "manifest.json":
             require(manifest["files"][name] == {"size": len(data), "sha256": sha(data)},
                     f"Release file damaged: {name}")
-    require((directory / "SHA256SUMS").read_text() == expected_sums, "SHA256SUMS mismatch")
+    require(read_utf8_lf(directory / "SHA256SUMS") == expected_sums, "SHA256SUMS mismatch")
     validate_factory((directory / FACTORY).read_bytes(), (directory / APP).read_bytes(),
                      manifest["components"])
     return manifest
+
+
+def merge_factory(output, images, settings):
+    """Merge PlatformIO components with the pinned esptool command contract."""
+    args = [sys.executable, "-m", "esptool", "--chip", settings["chip"], "merge-bin",
+            "--output", str(output), "--target-offset", "0x0"]
+    for option in ("flash_mode", "flash_freq", "flash_size"):
+        args += ["--" + option.replace("_", "-"), settings[option]]
+    for offset, path in images:
+        args += [hex(offset), str(path)]
+    subprocess.run(args, check=True)
 
 
 def package(root, directory, images, settings):
     require(settings == SETTINGS, "Unsupported Cardputer distribution settings")
     images = sorted(images)
     require(tuple(offset for offset, _ in images) == OFFSETS, "Unexpected PlatformIO upload images")
-    require(importlib.metadata.version("esptool") == "4.9.0", "Install pinned requirements-dev.txt")
+    require(importlib.metadata.version("esptool") == ESPTOOL_VERSION,
+            "Install pinned requirements-dev.txt")
     inputs = source_inputs(root)
     revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip()
-    dirty = bool(subprocess.check_output(
-        ["git", "status", "--porcelain", "--untracked-files=all", "--", *inputs], cwd=root, text=True))
+    dirty = bool(changed_source_inputs(root))
     directory.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(dir=directory.parent) as temporary:
         out = Path(temporary)
-        args = [sys.executable, "-m", "esptool", "--chip", settings["chip"], "merge_bin",
-                "--output", str(out / FACTORY), "--target-offset", "0x0"]
-        for option in ("flash_mode", "flash_freq", "flash_size"):
-            args += ["--" + option, settings[option]]
-        for offset, path in images:
-            args += [hex(offset), str(path)]
-        subprocess.run(args, check=True)
+        merge_factory(out / FACTORY, images, settings)
         shutil.copyfile(images[-1][1], out / APP)
         factory = (out / FACTORY).read_bytes()
         # merge_bin can update the bootloader header and digest. Hash final bytes.
@@ -152,9 +209,10 @@ def package(root, directory, images, settings):
                       for name in (FACTORY, APP)},
             "hardware_validation": "pending",
         }
-        (out / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
-        (out / "SHA256SUMS").write_text("".join(
-            f"{sha((out / name).read_bytes())}  {name}\n" for name in (FACTORY, APP, "manifest.json")))
+        write_utf8_lf(out / "manifest.json", json.dumps(manifest, indent=2) + "\n")
+        write_utf8_lf(out / "SHA256SUMS", "".join(
+            f"{sha((out / name).read_bytes())}  {name}\n"
+            for name in (FACTORY, APP, "manifest.json")))
         verify(out, root)
         directory.mkdir(exist_ok=True)
         for name in FILES:

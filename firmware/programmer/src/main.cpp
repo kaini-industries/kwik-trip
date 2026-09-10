@@ -8,6 +8,7 @@
 #include <SD.h>
 #include "sd_card.h"
 #include "display/App.hpp"
+#include "display/KeyboardInput.hpp"
 #include <Preferences.h>
 #endif
 
@@ -215,7 +216,8 @@ void loop() {
             if (input.length() < 95 && !inputOverflow) input += c;
             else inputOverflow = true;
         }
-        if (keys.del && input.length()) input.remove(input.length() - 1);
+        if (tagtinker::keyboard::consoleEraseRequested(keys) && input.length())
+            input.remove(input.length() - 1);
         if (keys.enter) {
             const String completed = input;
             input = "";

@@ -4,6 +4,7 @@
 #include "App.hpp"
 
 #include "TargetRenderer.hpp"
+#include "TargetEditing.hpp"
 #include "Theme.hpp"
 
 #include <SD.h>
@@ -480,6 +481,8 @@ void App::handleTargetMenu() {
     return;
   }
   if (M5Cardputer.Keyboard.isKeyPressed('1')) {
+    editingProfile_ = false;
+    saveError_ = false;
     resetInput();
     open(Screen::targetBarcode);
     return;
@@ -504,6 +507,7 @@ void App::handleTargetMenu() {
 void App::handleTargetInput() {
   const auto& keys = M5Cardputer.Keyboard.keysState();
   if (keys.backspace) {
+    saveError_ = false;
     inputError_ = target::ParseError::none;
     if (inputLength_ > 0U) {
       input_[--inputLength_] = '\0';
@@ -520,11 +524,14 @@ void App::handleTargetInput() {
       drawTargetInput();
       return;
     }
-    pendingTarget_ = parsed.record;
+    pendingTarget_ = editing::preserveSavedRecord(targets_, parsed.record);
     if (pendingTarget_.profile.kind != target::Kind::unknown) {
-      savePendingTarget();
+      if (!savePendingTarget()) {
+        drawTargetInput();
+      }
     } else {
       editingProfile_ = false;
+      saveError_ = false;
       open(Screen::targetProfileKind);
     }
     return;
@@ -546,6 +553,7 @@ void App::handleTargetInput() {
       input_[inputLength_++] = character;
       input_[inputLength_] = '\0';
       inputError_ = target::ParseError::none;
+      saveError_ = false;
     }
   }
   drawTargetInput();
@@ -556,6 +564,7 @@ void App::handleTargetProfileKind() {
   if (keys.backspace) {
     open(editingProfile_ ? Screen::targetDetails : Screen::targetBarcode);
   } else if (M5Cardputer.Keyboard.isKeyPressed('1')) {
+    saveError_ = false;
     pendingTarget_.profileOverridden = true;
     pendingTarget_.profile.kind = target::Kind::graphic;
     pendingTarget_.profile.pp16 = true;
@@ -564,10 +573,11 @@ void App::handleTargetProfileKind() {
     profileSizePage_ = 0;
     open(Screen::targetProfileSize);
   } else if (M5Cardputer.Keyboard.isKeyPressed('2')) {
-    pendingTarget_.profileOverridden = true;
-    pendingTarget_.profile.kind = target::Kind::segment;
-    pendingTarget_.profile.pp16 = false;
-    savePendingTarget();
+    saveError_ = false;
+    editing::configureSegment(pendingTarget_);
+    if (!savePendingTarget()) {
+      drawTargetProfileKind();
+    }
   }
 }
 
@@ -700,7 +710,10 @@ void App::handleTargetProfileColor() {
   } else {
     return;
   }
-  savePendingTarget();
+  saveError_ = false;
+  if (!savePendingTarget()) {
+    drawTargetProfileColor();
+  }
 }
 
 void App::handleTargetActions() {
@@ -916,6 +929,7 @@ void App::handleTargetDetails() {
   } else if (M5Cardputer.Keyboard.isKeyPressed('1')) {
     pendingTarget_ = *record;
     editingProfile_ = true;
+    saveError_ = false;
     open(Screen::targetProfileKind);
   } else if (M5Cardputer.Keyboard.isKeyPressed('2')) {
     open(Screen::targetRemove);
@@ -1091,14 +1105,14 @@ bool App::prepareFileImage(const char* path) {
   return render::file(M5Cardputer.Display, SD, path, record->profile, imageData_);
 }
 
-void App::savePendingTarget() {
+bool App::savePendingTarget() {
   const bool namingNewTarget = !editingProfile_ && pendingTarget_.name[0] == '\0';
   const int index = targets_.upsert(pendingTarget_);
   if (index < 0) {
-    targetListPage_ = 0;
-    open(Screen::target);
-    return;
+    saveError_ = true;
+    return false;
   }
+  saveError_ = false;
   editingProfile_ = false;
   selectedTarget_ = index;
   targetPage_ = static_cast<std::uint8_t>(pendingTarget_.profile.imagePage & 7U);
@@ -1108,6 +1122,7 @@ void App::savePendingTarget() {
   } else {
     open(Screen::targetActions);
   }
+  return true;
 }
 
 void App::resetInput() {
@@ -1298,7 +1313,7 @@ void App::drawTargetMenu() {
 
 void App::drawTargetInput() {
   canvas_.fillScreen(theme::background);
-  drawHeader("ESL barcode");
+  drawHeader(saveError_ ? "Save failed" : "ESL barcode");
 
   canvas_.setFont(&fonts::Font2);
   canvas_.setTextDatum(middle_left);
@@ -1316,20 +1331,25 @@ void App::drawTargetInput() {
   canvas_.setFont(&fonts::Font2);
   canvas_.setTextDatum(middle_right);
   canvas_.setTextColor(theme::text, theme::background);
-  if (inputError_ == target::ParseError::none)
+  if (inputError_ == target::ParseError::none && !saveError_)
     canvas_.drawString(count, screenWidth - 14, 94);
   if (inputError_ != target::ParseError::none) {
     canvas_.setTextDatum(middle_left);
     canvas_.setTextColor(theme::accent, theme::background);
     drawFitted(target::parseErrorLabel(inputError_), 14, 94, 212);
   }
-  drawFooter("Enter Save / Bksp Del", 123);
+  if (saveError_) {
+    canvas_.setTextDatum(middle_left);
+    canvas_.setTextColor(theme::accent, theme::background);
+    drawFitted("Storage failed or 9 slots full", 14, 94, 212);
+  }
+  drawFooter(saveError_ ? "Enter Retry / Bksp Back" : "Enter Save / Bksp Del", 123);
   present();
 }
 
 void App::drawTargetProfileKind() {
   canvas_.fillScreen(theme::background);
-  drawHeader("Choose tag family");
+  drawHeader(saveError_ ? "Save failed" : "Choose tag family");
 
   canvas_.setFont(&fonts::Font2);
   canvas_.setTextDatum(middle_left);
@@ -1337,7 +1357,7 @@ void App::drawTargetProfileKind() {
   canvas_.drawString("Choose your display", 18, 43);
   drawMenuLine('1', "Graphic display", 68);
   drawMenuLine('2', "Segment display", 94);
-  drawFooter("Bksp Back", 124);
+  drawFooter(saveError_ ? "Storage/full / Bksp Back" : "Bksp Back", 124);
   present();
 }
 
@@ -1415,12 +1435,12 @@ void App::drawTargetProfileOrientation() {
 
 void App::drawTargetProfileColor() {
   canvas_.fillScreen(theme::background);
-  drawHeader("Display colors");
+  drawHeader(saveError_ ? "Save failed - retry color" : "Display colors");
   drawMenuLine('1', "Black + white", 42);
   drawMenuLine('2', "B/W + red", 63);
   drawMenuLine('3', "B/W + yellow", 84);
   drawMenuLine('4', "B/W + red + yellow", 105);
-  drawFooter("Bksp Back", 127);
+  drawFooter(saveError_ ? "Storage/full / Bksp Back" : "Bksp Back", 127);
   present();
 }
 
@@ -1828,25 +1848,22 @@ void App::drawWebUi() {
   drawFitted(bleBridge_.deviceName().c_str(), 58, 66, 170);
 
   const bool bleConn = bleBridge_.connected();
-  canvas_.setFont(&fonts::Font2);
-
-  if (!bleConn) {
-    canvas_.setTextColor(theme::accent, theme::background);
-    canvas_.drawString(useBluetooth_ ? "> Connect BLE" : "> Connect USB serial", 12, 92);
+  const bool bleSecure = bleBridge_.secure();
+  canvas_.setTextColor(theme::accent, theme::background);
+  if (useBluetooth_) {
+    char passkey[24]{};
+    std::snprintf(passkey, sizeof(passkey), "PAIR CODE: %06lu",
+                  static_cast<unsigned long>(bleBridge_.pairingPasskey()));
+    canvas_.setFont(&fonts::Font0);
+    canvas_.drawString(passkey, 12, 84);
+    canvas_.setFont(&fonts::Font2);
+    canvas_.drawString(bleSecure ? "Encrypted BLE connected"
+                                : bleConn ? "Enter code in browser prompt"
+                                          : "> Pair + connect BLE",
+                       12, 99);
   } else {
-    if (status == InfraredTransmitter::Status::succeeded) {
-      canvas_.setTextColor(theme::accent, theme::background);
-      canvas_.drawString("IR complete", 12, 92);
-    } else if (status == InfraredTransmitter::Status::error) {
-      canvas_.setTextColor(theme::accent, theme::background);
-      canvas_.drawString("IR Error", 12, 92);
-    } else if (status == InfraredTransmitter::Status::cancelled) {
-      canvas_.setTextColor(theme::accent, theme::background);
-      canvas_.drawString("IR Cancelled", 12, 92);
-    } else {
-      canvas_.setTextColor(theme::accent, theme::background);
-      canvas_.drawString("BLE Connected", 12, 92);
-    }
+    canvas_.setFont(&fonts::Font2);
+    canvas_.drawString(bleConn ? "USB serial connected" : "> Connect USB serial", 12, 92);
   }
 
   drawFooter("Bksp Exit", 121);

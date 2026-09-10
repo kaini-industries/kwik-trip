@@ -82,6 +82,8 @@
     studioColorPlane: true,
     studioPage: 1,
     speed: 'reliable',
+    contentRevision: 0,
+    stagedArtwork: null,
 
     activePlugin: 'github',
 
@@ -107,6 +109,11 @@
     buffer: '',
     pendingReply: null,
     sendQueue: Promise.resolve(),
+    session: 0,
+    stopping: false,
+    serialReadTask: null,
+    bleDecoder: null,
+    bleNotificationHandler: null,
 
     NUS_SERVICE: '6e400001-b5a3-f393-e0a9-e50e24dcca9e',
     NUS_RX: '6e400002-b5a3-f393-e0a9-e50e24dcca9e',
@@ -116,37 +123,82 @@
       return this.connected;
     },
 
+    beginSession() {
+      this.session += 1;
+      this.stopping = false;
+      this.buffer = '';
+      this.sendQueue = Promise.resolve();
+      resetTransferSession();
+      return this.session;
+    },
+
+    markDisconnected(session) {
+      if (session !== this.session) return;
+      if (this.bleTx && this.bleNotificationHandler) {
+        this.bleTx.removeEventListener('characteristicvaluechanged', this.bleNotificationHandler);
+      }
+      this.session += 1;
+      this.connected = false;
+      this.stopping = true;
+      this.buffer = '';
+      this.deviceName = '';
+      this.bleDevice = null;
+      this.bleServer = null;
+      this.bleRx = null;
+      this.bleTx = null;
+      this.bleDecoder = null;
+      this.bleNotificationHandler = null;
+      this.serialPort = null;
+      this.serialReader = null;
+      this.serialWriter = null;
+      this.serialReadTask = null;
+      const pending = this.pendingReply;
+      this.pendingReply = null;
+      if (pending) pending.reject(new Error('Device disconnected.'));
+      resetTransferSession();
+      this.updateUi();
+    },
+
     async connectBle() {
       if (!navigator.bluetooth) {
         alert('Web Bluetooth is not supported on this browser. Try Chrome, Edge, or Bluefy on iOS.');
         return;
       }
 
+      const session = this.beginSession();
+      let device = null;
       try {
-        const device = await navigator.bluetooth.requestDevice({
+        device = await navigator.bluetooth.requestDevice({
           filters: [{ namePrefix: 'etag Cardputer' }],
           optionalServices: [this.NUS_SERVICE]
         });
 
         const server = await device.gatt.connect();
         const service = await server.getPrimaryService(this.NUS_SERVICE);
-        this.bleRx = await service.getCharacteristic(this.NUS_RX);
-        this.bleTx = await service.getCharacteristic(this.NUS_TX);
+        const rx = await service.getCharacteristic(this.NUS_RX);
+        const tx = await service.getCharacteristic(this.NUS_TX);
+        if (session !== this.session) {
+          if (device.gatt.connected) device.gatt.disconnect();
+          return;
+        }
 
-        await this.bleTx.startNotifications();
-        this.bleTx.addEventListener('characteristicvaluechanged', (e) => {
-          const dec = new TextDecoder();
-          const chunk = dec.decode(e.target.value);
+        this.bleDecoder = new TextDecoder();
+        this.bleNotificationHandler = (e) => {
+          if (session !== this.session || device !== this.bleDevice) return;
+          const chunk = this.bleDecoder.decode(e.target.value, { stream: true });
           this.handleIncoming(chunk);
-        });
+        };
+        await tx.startNotifications();
+        tx.addEventListener('characteristicvaluechanged', this.bleNotificationHandler);
 
         device.addEventListener('gattserverdisconnected', () => {
-          this.connected = false;
-          this.updateUi();
+          this.markDisconnected(session);
         });
 
         this.bleDevice = device;
         this.bleServer = server;
+        this.bleRx = rx;
+        this.bleTx = tx;
         this.connected = true;
         this.type = 'ble';
         this.deviceName = device.name || 'etag Cardputer';
@@ -154,6 +206,8 @@
 
         await this.sendLine('{"cmd":"getState"}');
       } catch (err) {
+        if (device && device.gatt.connected) device.gatt.disconnect();
+        this.markDisconnected(session);
         console.error('BLE connection failed:', err);
         alert('Bluetooth error: ' + err.message);
       }
@@ -165,9 +219,15 @@
         return;
       }
 
+      const session = this.beginSession();
+      let port = null;
       try {
-        const port = await navigator.serial.requestPort();
+        port = await navigator.serial.requestPort();
         await port.open({ baudRate: 115200 });
+        if (session !== this.session) {
+          await port.close();
+          return;
+        }
 
         this.serialPort = port;
         this.connected = true;
@@ -175,59 +235,120 @@
         this.deviceName = 'USB Serial';
         this.updateUi();
 
-        this.readSerialLoop();
+        const readTask = this.readSerialLoop(port, session);
+        this.serialReadTask = readTask;
         await this.sendLine('{"cmd":"getState"}');
       } catch (err) {
+        if (session === this.session && port && port === this.serialPort) {
+          try { await this.disconnect(); } catch (_) {}
+        } else if (port && session === this.session) {
+          try { await port.close(); } catch (_) {}
+          this.markDisconnected(session);
+        }
         console.error('Serial connection error:', err);
         alert('Serial error: ' + err.message);
       }
     },
 
-    async readSerialLoop() {
+    async readSerialLoop(port, session) {
       const dec = new TextDecoder();
-      while (this.serialPort && this.serialPort.readable) {
-        this.serialReader = this.serialPort.readable.getReader();
-        try {
-          while (true) {
-            const { value, done } = await this.serialReader.read();
-            if (done) break;
-            if (value) {
-              this.handleIncoming(dec.decode(value));
-            }
+      let reader = null;
+      try {
+        if (session !== this.session || this.stopping || !port.readable) return;
+        reader = port.readable.getReader();
+        this.serialReader = reader;
+        while (session === this.session && !this.stopping) {
+          const { value, done } = await reader.read();
+          if (session !== this.session || this.stopping) break;
+          if (done) break;
+          if (value) {
+            this.handleIncoming(dec.decode(value, { stream: true }));
           }
-        } catch (err) {
-          console.warn('Serial read error:', err);
-          break;
-        } finally {
-          this.serialReader.releaseLock();
         }
+        if (session === this.session && !this.stopping) this.handleIncoming(dec.decode());
+      } catch (err) {
+        if (session === this.session && !this.stopping) console.warn('Serial read error:', err);
+      } finally {
+        if (reader) reader.releaseLock();
+        if (this.serialReader === reader) this.serialReader = null;
       }
-      this.connected = false;
-      this.updateUi();
+
+      if (session === this.session && !this.stopping) {
+        try { await port.close(); } catch (_) {}
+        this.markDisconnected(session);
+      }
     },
 
     async disconnect() {
-      if (this.pendingReply) this.pendingReply.reject(new Error('Device disconnected.'));
-      this.buffer = '';
-      if (this.type === 'ble' && this.bleDevice && this.bleDevice.gatt.connected) {
-        await this.bleDevice.gatt.disconnect();
-      }
-      if (this.type === 'serial' && this.serialPort) {
-        if (this.serialReader) await this.serialReader.cancel();
-        await this.serialPort.close();
-      }
+      const closingSession = this.session;
+      const serialPort = this.serialPort;
+      const serialReader = this.serialReader;
+      const serialWriter = this.serialWriter;
+      const serialReadTask = this.serialReadTask;
+      const bleDevice = this.bleDevice;
+      const bleTx = this.bleTx;
+      const bleNotificationHandler = this.bleNotificationHandler;
+      const writes = this.sendQueue;
+      this.session += 1;
+      this.stopping = true;
       this.connected = false;
+      this.buffer = '';
+      this.sendQueue = Promise.resolve();
+      const pending = this.pendingReply;
+      this.pendingReply = null;
+      if (pending) pending.reject(new Error('Device disconnected.'));
+      resetTransferSession();
       this.updateUi();
+
+      if (bleTx && bleNotificationHandler) {
+        bleTx.removeEventListener('characteristicvaluechanged', bleNotificationHandler);
+      }
+      if (bleDevice && bleDevice.gatt.connected) bleDevice.gatt.disconnect();
+
+      if (serialWriter) {
+        try { await serialWriter.abort(new Error('Device disconnected.')); } catch (_) {}
+      }
+      try { await writes; } catch (_) {}
+      if (serialReader) {
+        try { await serialReader.cancel(); } catch (_) {}
+      }
+      if (serialReadTask) {
+        try { await serialReadTask; } catch (_) {}
+      }
+      let closeError = null;
+      if (serialPort) {
+        try { await serialPort.close(); } catch (error) { closeError = error; }
+      }
+
+      if (closingSession + 1 === this.session) {
+        this.bleDevice = null;
+        this.bleServer = null;
+        this.bleRx = null;
+        this.bleTx = null;
+        this.bleDecoder = null;
+        this.bleNotificationHandler = null;
+        this.serialPort = null;
+        this.serialReader = null;
+        this.serialWriter = null;
+        this.serialReadTask = null;
+      }
+      if (closeError) throw closeError;
     },
 
     sendLine(str) {
       // Whole JSON lines must not interleave across asynchronous BLE writes.
-      const next = this.sendQueue.catch(() => {}).then(() => this.writeLine(str));
+      const session = this.session;
+      const next = this.sendQueue.catch(() => {}).then(() => {
+        if (session !== this.session || this.stopping || !this.connected) {
+          throw new Error('Device disconnected.');
+        }
+        return this.writeLine(str, session);
+      });
       this.sendQueue = next;
       return next;
     },
 
-    async writeLine(str) {
+    async writeLine(str, session = this.session) {
       if (!str.endsWith('\n')) str += '\n';
       const enc = new TextEncoder();
       const bytes = enc.encode(str);
@@ -235,13 +356,18 @@
       if (this.type === 'ble' && this.bleRx) {
         const MTU = 20;
         for (let i = 0; i < bytes.length; i += MTU) {
+          if (session !== this.session || this.stopping) throw new Error('Device disconnected.');
           const slice = bytes.slice(i, i + MTU);
           await this.bleRx.writeValueWithResponse(slice);
         }
       } else if (this.type === 'serial' && this.serialPort && this.serialPort.writable) {
         const writer = this.serialPort.writable.getWriter();
+        this.serialWriter = writer;
         try { await writer.write(bytes); }
-        finally { writer.releaseLock(); }
+        finally {
+          if (this.serialWriter === writer) this.serialWriter = null;
+          writer.releaseLock();
+        }
       } else {
         throw new Error('Device disconnected.');
       }
@@ -252,14 +378,15 @@
       let timer;
       const reply = new Promise((resolve, reject) => {
         timer = setTimeout(() => reject(new Error('Device did not acknowledge the upload.')), 10000);
-        this.pendingReply = { event, resolve, reject };
+        this.pendingReply = { event, resolve, reject, session: this.session };
       });
+      const pending = this.pendingReply;
       try {
         const [, data] = await Promise.all([this.sendLine(JSON.stringify(command)), reply]);
         return data;
       } finally {
         clearTimeout(timer);
-        this.pendingReply = null;
+        if (this.pendingReply === pending) this.pendingReply = null;
       }
     },
 
@@ -286,40 +413,60 @@
     },
 
     handleMessage(msg) {
+      if (!msg || typeof msg !== 'object' || Array.isArray(msg) ||
+          typeof msg.event !== 'string' || !/^[A-Za-z][A-Za-z0-9]{0,31}$/.test(msg.event)) {
+        rejectDeviceMessage('Invalid event envelope received from the device.');
+        return;
+      }
       if (msg.data && (msg.data.speed === 'fast' || msg.data.speed === 'reliable')) {
         state.speed = msg.data.speed;
         document.getElementById('transfer-speed').value = state.speed;
       }
-      if (this.pendingReply) {
+      if (this.pendingReply && this.pendingReply.session === this.session) {
         if (msg.event === this.pendingReply.event) this.pendingReply.resolve(msg.data);
         if (msg.event === 'error') this.pendingReply.reject(new Error(msg.message || 'Upload rejected.'));
       }
       if (msg.event === 'state' && msg.data) {
-        state.status = msg.data.status || 'idle';
-        state.progress = typeof msg.data.progress === 'number' ? msg.data.progress : 0;
-        if (Array.isArray(msg.data.tags)) {
-          state.tags = msg.data.tags;
-          renderTagSelector();
-          renderSavedTags();
+        const next = normalizeDeviceState(msg.data);
+        if (!next) {
+          rejectDeviceMessage('Invalid state response received from the device.');
+          return;
         }
+        const tagsChanged = tagListSignature(state.tags) !== tagListSignature(next.tags);
+        state.tags = next.tags;
+        state.speed = next.speed;
+        document.getElementById('transfer-speed').value = state.speed;
+        if (tagsChanged) invalidateArtwork();
+        renderTagSelector();
+        renderSavedTags();
+        applyDeviceTransferStatus(next);
         updateStatusIndicator();
         updateTxHud();
       } else if (msg.event === 'progress' || msg.event === 'status') {
         const d = msg.data || msg;
-        if (d.status) state.status = d.status;
-        if (typeof d.progress === 'number') state.progress = d.progress;
+        const transfer = normalizeTransferStatus(d);
+        if (!transfer) {
+          rejectDeviceMessage('Invalid transfer status received from the device.');
+          return;
+        }
+        if (transfer.speed) {
+          state.speed = transfer.speed;
+          document.getElementById('transfer-speed').value = state.speed;
+        }
+        applyDeviceTransferStatus(transfer);
         updateStatusIndicator();
         updateTxHud();
       } else if (msg.event === 'artLoaded') {
-        state.status = 'loaded';
-        state.progress = 0;
-        updateStatusIndicator();
-        updateTxHud();
+        // sendArtwork validates and adopts this acknowledgement after the upload
+        // promise resumes. An unsolicited artLoaded event never enables transmit.
       } else if (msg.event === 'artStarted') {
-        state.status = 'sending';
-        state.progress = 0;
-        updateStatusIndicator();
-        updateTxHud();
+        const stage = normalizeStageReference(msg.data);
+        if (stage && stageReferenceMatches(stage)) {
+          state.status = 'sending';
+          state.progress = 0;
+          updateStatusIndicator();
+          updateTxHud();
+        }
       } else if (msg.event === 'cancelled') {
         state.status = 'cancelled';
         updateStatusIndicator();
@@ -328,7 +475,8 @@
         state.status = 'error';
         updateStatusIndicator();
         updateTxHud();
-        alert('Device Error: ' + (msg.message || 'Unknown'));
+        const message = typeof msg.message === 'string' && msg.message.length <= 256 ? msg.message : 'Unknown';
+        alert('Device Error: ' + message);
       }
     },
 
@@ -345,7 +493,9 @@
         comp: encoded.compression
       };
       const ready = await this.request(startCmd, 'artReady');
-      if (ready.len !== encoded.bytes.length) throw new Error('Artwork size was not accepted.');
+      if (!ready || !Number.isInteger(ready.len) || ready.len !== encoded.bytes.length) {
+        throw new Error('Artwork size was not accepted.');
+      }
 
       const chunkSize = 240;
       const totalBytes = encoded.bytes.length;
@@ -356,7 +506,8 @@
         const b64 = btoa(binary);
 
         const ack = await this.request({ cmd: 'artChunk', offset, data: b64 }, 'chunkAck');
-        if (ack.received !== offset + slice.length || ack.expected !== totalBytes) {
+        if (!ack || !Number.isInteger(ack.received) || !Number.isInteger(ack.expected) ||
+            ack.received !== offset + slice.length || ack.expected !== totalBytes) {
           throw new Error('Artwork upload lost a chunk. Restart the upload.');
         }
 
@@ -368,7 +519,12 @@
 
       }
 
-      await this.request({ cmd: 'finishArt' }, 'artLoaded');
+      const loaded = await this.request({ cmd: 'finishArt' }, 'artLoaded');
+      const stage = normalizeStageReference(loaded);
+      if (!stage || stage.id !== tagId || stage.page !== parseInt(page, 10)) {
+        throw new Error('Cardputer firmware did not identify the staged artwork. Update its firmware and retry.');
+      }
+      return stage;
     },
 
     updateUi() {
@@ -403,15 +559,177 @@
     }
   };
 
+  const TRANSFER_STATUSES = new Set(['idle', 'uploading', 'loaded', 'sending', 'sent', 'error', 'cancelled']);
+
+  function boundedString(value, maximum) {
+    return typeof value === 'string' && value.length <= maximum ? value : null;
+  }
+
+  function normalizeTag(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    if (typeof value.id !== 'string' || !/^[0-9a-fA-F]{8}$/.test(value.id)) return null;
+    const id = value.id.toUpperCase();
+    const name = boundedString(value.name, 24);
+    const barcode = boundedString(value.barcode, 17);
+    const model = boundedString(value.model, 64);
+    if (name === null || barcode === null || model === null ||
+        !/^[A-Za-z0-9]4[0-9]{15}$/.test(barcode) ||
+        typeof value.rotate !== 'boolean' || typeof value.graphic !== 'boolean' ||
+        !Number.isInteger(value.width) || !Number.isInteger(value.height) ||
+        !Number.isInteger(value.color) || value.color < 0 || value.color > 3 ||
+        !Number.isInteger(value.page) || value.page < 0 || value.page > 7 ||
+        (value.transport !== 'ir_pp4' && value.transport !== 'ir_pp16')) return null;
+
+    if (value.graphic) {
+      const pixels = value.width * value.height;
+      if (value.width < 8 || value.width > 2048 || value.height < 8 || value.height > 2048 ||
+          pixels > 384000 || pixels % 8 !== 0) return null;
+    } else if (value.width !== 0 || value.height !== 0 || value.transport !== 'ir_pp4') {
+      return null;
+    }
+
+    return {
+      id, name, barcode, model,
+      width: value.width,
+      height: value.height,
+      rotate: value.rotate,
+      color: value.color,
+      graphic: value.graphic,
+      page: value.page,
+      transport: value.transport,
+      firmwareRead: value.firmwareRead === true,
+      firmwareWrite: value.firmwareWrite === true,
+      acknowledged: value.acknowledged === true
+    };
+  }
+
+  function normalizeStageReference(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value) ||
+        typeof value.id !== 'string' || !/^[0-9a-fA-F]{8}$/.test(value.id) ||
+        !Number.isInteger(value.page) || value.page < 0 || value.page > 7 ||
+        !Number.isInteger(value.stage) || value.stage < 1 || value.stage > 0xffffffff) return null;
+    return { id: value.id.toUpperCase(), page: value.page, stage: value.stage };
+  }
+
+  function normalizeTransferStatus(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value) ||
+        typeof value.status !== 'string' || !TRANSFER_STATUSES.has(value.status) ||
+        !Number.isInteger(value.progress) || value.progress < 0 || value.progress > 100) return null;
+    if (value.speed !== undefined && value.speed !== 'fast' && value.speed !== 'reliable') return null;
+    const hasStageField = value.stage !== undefined || value.id !== undefined || value.page !== undefined;
+    const stage = hasStageField ? normalizeStageReference(value) : null;
+    if (hasStageField && !stage) return null;
+    return {
+      status: value.status,
+      progress: value.progress,
+      speed: value.speed,
+      stage
+    };
+  }
+
+  function normalizeDeviceState(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value) ||
+        boundedString(value.device, 64) === null || !Array.isArray(value.tags) || value.tags.length > 9 ||
+        (value.speed !== 'fast' && value.speed !== 'reliable')) return null;
+    const transfer = normalizeTransferStatus(value);
+    if (!transfer) return null;
+    const tags = value.tags.map(normalizeTag);
+    if (tags.some(tag => tag === null) || new Set(tags.map(tag => tag.id)).size !== tags.length) return null;
+    return { device: value.device, tags, ...transfer };
+  }
+
+  function tagListSignature(tags) {
+    return JSON.stringify(tags.map(tag => [tag.id, tag.width, tag.height, tag.rotate, tag.color,
+      tag.graphic, tag.page, tag.transport]));
+  }
+
+  function sameBytes(left, right) {
+    if (!(left instanceof Uint8Array) || !(right instanceof Uint8Array) || left.length !== right.length) return false;
+    for (let i = 0; i < left.length; i++) if (left[i] !== right[i]) return false;
+    return true;
+  }
+
+  function stageReferenceMatches(reference) {
+    const staged = state.stagedArtwork;
+    return Boolean(staged && reference && staged.session === Transport.session &&
+      staged.id === reference.id && staged.page === reference.page && staged.stage === reference.stage);
+  }
+
+  function stagedArtworkMatches(active, page, bitstream) {
+    const staged = state.stagedArtwork;
+    return Boolean(staged && Transport.isConnected() && staged.session === Transport.session &&
+      active && staged.id === active.id && staged.page === page &&
+      staged.revision === state.contentRevision && sameBytes(staged.bitstream, bitstream));
+  }
+
+  function buildTransmitCommand(staged) {
+    const reference = normalizeStageReference(staged);
+    if (!reference) throw new Error('No valid staged artwork is available.');
+    return { cmd: 'transmit', id: reference.id, page: reference.page, stage: reference.stage };
+  }
+
+  function applyDeviceTransferStatus(transfer) {
+    if ((transfer.status === 'loaded' || transfer.status === 'sent') &&
+        (!transfer.stage || !stageReferenceMatches(transfer.stage))) {
+      if (state.status !== 'uploading' && state.status !== 'sending') {
+        state.status = 'idle';
+        state.progress = 0;
+      }
+      return;
+    }
+    if (transfer.stage && !stageReferenceMatches(transfer.stage) &&
+        (transfer.status === 'sending' || transfer.status === 'sent')) return;
+    state.status = transfer.status;
+    state.progress = transfer.progress;
+  }
+
+  function resetTransferSession() {
+    state.stagedArtwork = null;
+    state.status = 'idle';
+    state.progress = 0;
+  }
+
+  function invalidateArtwork() {
+    state.contentRevision += 1;
+    state.stagedArtwork = null;
+    if (state.status !== 'uploading' && state.status !== 'sending') {
+      state.status = 'idle';
+      state.progress = 0;
+    }
+    updateStatusIndicator();
+    updateTxHud();
+  }
+
+  function rejectDeviceMessage(reason) {
+    console.warn(reason);
+    const pending = Transport.pendingReply;
+    Transport.pendingReply = null;
+    if (pending) pending.reject(new Error(reason));
+    state.status = 'error';
+    state.progress = 0;
+    updateStatusIndicator();
+    updateTxHud();
+  }
+
+  async function disconnectTransport() {
+    try {
+      await Transport.disconnect();
+    } catch (error) {
+      console.error('Disconnect failed:', error);
+      alert('Disconnect error: ' + error.message);
+    }
+  }
+
   function ditherFloydSteinberg(ctx, width, height, opts = {}) {
     const imgData = ctx.getImageData(0, 0, width, height);
     const d = imgData.data;
     const invert = opts.invert || false;
-    const contrastFactor = (259 * (opts.contrast + 255)) / (255 * (259 - opts.contrast));
-    const isColorTag = opts.isColorTag || false;
+    const contrast = Number.isFinite(opts.contrast) ? opts.contrast : 0;
+    const contrastFactor = (259 * (contrast + 255)) / (255 * (259 - contrast));
+    const colorMode = Number.isInteger(opts.colorMode) ? opts.colorMode : 0;
 
     const lum = new Float32Array(width * height);
-    const colorMask = new Uint8Array(width * height); // 1 = Red/Yellow accent
+    const colorMask = new Uint8Array(width * height); // 2 = red, 3 = yellow
 
     for (let i = 0; i < lum.length; i++) {
       let r = d[i * 4];
@@ -422,12 +740,10 @@
       g = Math.min(255, Math.max(0, contrastFactor * (g - 128) + 128));
       b = Math.min(255, Math.max(0, contrastFactor * (b - 128) + 128));
 
-      if (isColorTag && opts.colorPlane) {
-        const max = Math.max(r, g, b);
-        const min = Math.min(r, g, b);
-        const sat = max === 0 ? 0 : (max - min) / max;
-        if (sat > 0.45 && r > 140 && g < 110 && b < 110) {
-          colorMask[i] = 1;
+      if (colorMode !== 0 && opts.colorPlane) {
+        const pixelColor = classifyPixel(r, g, b, colorMode);
+        if (pixelColor === 2 || pixelColor === 3) {
+          colorMask[i] = colorMode === 2 ? 3 : pixelColor;
         }
       }
 
@@ -437,10 +753,14 @@
     }
 
     if (opts.algo === 'threshold') {
-      const thresh = opts.threshold || 128;
+      const thresh = Number.isFinite(opts.threshold) ? opts.threshold : 128;
       for (let i = 0; i < lum.length; i++) {
-        if (colorMask[i] === 1) {
-          d[i * 4] = 239; d[i * 4 + 1] = 68; d[i * 4 + 2] = 68; d[i * 4 + 3] = 255;
+        if (colorMask[i] !== 0) {
+          const yellow = colorMask[i] === 3;
+          d[i * 4] = yellow ? 245 : 239;
+          d[i * 4 + 1] = yellow ? 197 : 68;
+          d[i * 4 + 2] = yellow ? 24 : 68;
+          d[i * 4 + 3] = 255;
         } else {
           const val = lum[i] >= thresh ? 255 : 0;
           d[i * 4] = val; d[i * 4 + 1] = val; d[i * 4 + 2] = val; d[i * 4 + 3] = 255;
@@ -450,8 +770,12 @@
       for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
           const idx = y * width + x;
-          if (colorMask[idx] === 1) {
-            d[idx * 4] = 239; d[idx * 4 + 1] = 68; d[idx * 4 + 2] = 68; d[idx * 4 + 3] = 255;
+          if (colorMask[idx] !== 0) {
+            const yellow = colorMask[idx] === 3;
+            d[idx * 4] = yellow ? 245 : 239;
+            d[idx * 4 + 1] = yellow ? 197 : 68;
+            d[idx * 4 + 2] = yellow ? 24 : 68;
+            d[idx * 4 + 3] = 255;
             continue;
           }
 
@@ -549,8 +873,10 @@
     const sat = max === 0 ? 0 : (max - min) / max;
 
     if (sat > 0.4) {
-      if (r > 140 && g < 110 && b < 110) return 2; // Red
-      if (r > 140 && g > 120 && b < 80) return colorMode === 3 ? 3 : 2; // Yellow
+      if ((colorMode === 1 || colorMode === 3) && r > 140 && g < 110 && b < 110) return 2;
+      if ((colorMode === 2 || colorMode === 3) && r > 140 && g > 120 && b < 80) {
+        return colorMode === 3 ? 3 : 2;
+      }
     }
     return lum > 128 ? 1 : 0;
   }
@@ -713,8 +1039,13 @@
   }
 
   function updateTxHud() {
-    document.getElementById('transfer-speed').disabled =
-      state.status === 'sending' || state.status === 'uploading';
+    const transferBusy = state.status === 'sending' || state.status === 'uploading';
+    document.getElementById('transfer-speed').disabled = transferBusy;
+    document.getElementById('btn-quick-blink').disabled =
+      transferBusy || !Transport.isConnected();
+    document.querySelectorAll('.btn-delete-tag').forEach(button => {
+      button.disabled = transferBusy;
+    });
     const hud = document.getElementById('transmit-hud');
     const sendBtn = document.getElementById('btn-send-esl');
     const fill = document.getElementById('hud-progress-fill');
@@ -788,45 +1119,67 @@
 
   function renderSavedTags() {
     const container = document.getElementById('saved-tags-list');
-    container.innerHTML = '';
+    container.textContent = '';
 
     if (!state.tags.length) {
-      container.innerHTML = `
-        <div style="color: var(--text-muted); font-size: 11px; text-align: center; padding: 20px;">
-          No tags found on Cardputer NVS.<br>Scan a barcode above to add one.
-        </div>
-      `;
+      const empty = document.createElement('div');
+      empty.style.cssText = 'color: var(--text-muted); font-size: 11px; text-align: center; padding: 20px;';
+      empty.append('No tags found on Cardputer NVS.', document.createElement('br'),
+        'Scan a barcode above to add one.');
+      container.appendChild(empty);
       return;
     }
 
     state.tags.forEach(tag => {
       const item = document.createElement('div');
-      item.className = `tag-item ${tag.id === state.activeTagId ? 'active' : ''}`;
-      item.innerHTML = `
-        <div class="tag-info">
-          <div class="tag-title">
-            <span>🏷️</span>
-            <span>${escapeHtml(tag.name || 'Unnamed')}</span>
-            <span style="font-family: var(--font-mono); font-size: 10px; color: var(--text-muted);">[${tag.id}]</span>
-          </div>
-          <div class="tag-meta">
-            ${escapeHtml(tag.model)} • ${tag.width}×${tag.height} • ${colorLabel(tag.color)}
-          </div>
-        </div>
-        <div class="tag-actions">
-          <button class="btn btn-secondary btn-sm btn-select-tag" data-id="${tag.id}">SELECT</button>
-          <button class="btn btn-danger btn-sm btn-delete-tag" data-id="${tag.id}">✕</button>
-        </div>
-      `;
+      item.className = 'tag-item';
+      if (tag.id === state.activeTagId) item.classList.add('active');
 
-      item.querySelector('.btn-select-tag').addEventListener('click', () => {
-        state.activeTagId = tag.id;
+      const info = document.createElement('div');
+      info.className = 'tag-info';
+      const title = document.createElement('div');
+      title.className = 'tag-title';
+      const icon = document.createElement('span');
+      icon.textContent = '🏷️';
+      const name = document.createElement('span');
+      name.textContent = tag.name || 'Unnamed';
+      const id = document.createElement('span');
+      id.style.cssText = 'font-family: var(--font-mono); font-size: 10px; color: var(--text-muted);';
+      id.textContent = `[${tag.id}]`;
+      title.append(icon, name, id);
+      const meta = document.createElement('div');
+      meta.className = 'tag-meta';
+      meta.textContent = `${tag.model} • ${tag.width}×${tag.height} • ${colorLabel(tag.color)}`;
+      info.append(title, meta);
+
+      const actions = document.createElement('div');
+      actions.className = 'tag-actions';
+      const select = document.createElement('button');
+      select.type = 'button';
+      select.className = 'btn btn-secondary btn-sm btn-select-tag';
+      select.dataset.id = tag.id;
+      select.textContent = 'SELECT';
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'btn btn-danger btn-sm btn-delete-tag';
+      remove.dataset.id = tag.id;
+      remove.textContent = '✕';
+      remove.disabled = state.status === 'uploading' || state.status === 'sending';
+      actions.append(select, remove);
+      item.append(info, actions);
+
+      select.addEventListener('click', () => {
+        if (state.activeTagId !== tag.id) {
+          state.activeTagId = tag.id;
+          invalidateArtwork();
+        }
         renderTagSelector();
         renderSavedTags();
         switchTab('view-image');
       });
 
-      item.querySelector('.btn-delete-tag').addEventListener('click', async () => {
+      remove.addEventListener('click', async () => {
+        if (state.status === 'uploading' || state.status === 'sending') return;
         if (!confirm(`Remove tag "${tag.name || tag.id}"?`)) return;
         await Transport.sendLine(JSON.stringify({ cmd: 'removeTag', id: tag.id }));
       });
@@ -919,7 +1272,7 @@
       contrast: state.studioContrast,
       threshold: state.studioThreshold,
       algo: state.studioDither,
-      isColorTag: active && active.color !== 0,
+      colorMode: active ? active.color : 0,
       colorPlane: state.studioColorPlane
     });
   }
@@ -931,11 +1284,7 @@
       const img = new Image();
       img.onload = () => {
         state.studioImage = img;
-        if (state.status === 'loaded' || state.status === 'sent') {
-          state.status = 'idle';
-          updateStatusIndicator();
-          updateTxHud();
-        }
+        invalidateArtwork();
         renderStudioImage();
       };
       img.src = e.target.result;
@@ -984,7 +1333,7 @@
     ctx.fillText(`REPOS: ${data.public_repos}   FOLLOWERS: ${data.followers}`, 14, 46);
 
     if (active && active.color !== 0) {
-      ctx.fillStyle = '#ef4444';
+      ctx.fillStyle = active.color === 2 ? '#f5c518' : '#ef4444';
       ctx.fillRect(14, 54, w - 28, 2);
     }
 
@@ -1006,7 +1355,7 @@
     ctx.fillText('SOL: $' + data.sol.toLocaleString(), 12, 80);
 
     if (active && active.color !== 0) {
-      ctx.fillStyle = '#ef4444';
+      ctx.fillStyle = active.color === 2 ? '#f5c518' : '#ef4444';
       ctx.fillRect(12, 92, w - 24, 3);
     }
   }
@@ -1028,7 +1377,7 @@
     ctx.fillText(timeStr, 14, 68);
 
     if (active && active.color !== 0) {
-      ctx.fillStyle = '#ef4444';
+      ctx.fillStyle = active.color === 2 ? '#f5c518' : '#ef4444';
       ctx.fillRect(14, 78, w - 28, 3);
     }
   }
@@ -1212,7 +1561,10 @@
   }
 
   function switchTab(viewId) {
+    const previousContentView = state.viewMode === 'view-plugins' ? 'plugins' : 'image';
+    const nextContentView = viewId === 'view-plugins' ? 'plugins' : 'image';
     state.viewMode = viewId;
+    if (previousContentView !== nextContentView) invalidateArtwork();
     document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active'));
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
 
@@ -1226,12 +1578,6 @@
       stopCamera();
     }
     renderActiveCanvas();
-  }
-
-  function escapeHtml(str) {
-    return String(str || '').replace(/[&<>"']/g, m => ({
-      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-    })[m]);
   }
 
   function setupEvents() {
@@ -1249,9 +1595,9 @@
         select.disabled = state.status === 'sending' || state.status === 'uploading';
       }
     });
-    document.getElementById('btn-header-connect').addEventListener('click', () => {
+    document.getElementById('btn-header-connect').addEventListener('click', async () => {
       if (Transport.isConnected()) {
-        Transport.disconnect();
+        await disconnectTransport();
       } else {
         Transport.type === 'ble' ? Transport.connectBle() : Transport.connectSerial();
       }
@@ -1259,19 +1605,31 @@
 
     document.getElementById('btn-send-esl').addEventListener('click', async () => {
       const active = getActiveTag();
-      if (!active) {
-        alert('Please connect to Cardputer or select a saved tag first.');
+      if (!active || !active.graphic) {
+        alert('Please connect to Cardputer and select a saved graphic tag first.');
         return;
       }
+      if (!Transport.isConnected()) {
+        alert('Connect the Cardputer before uploading artwork.');
+        return;
+      }
+      if (state.status === 'uploading' || state.status === 'sending') return;
 
-      if (state.status === 'loaded' || state.status === 'sent') {
+      const canvas = document.getElementById('esl-canvas');
+      const bitstream = exportEslBitstream(canvas, active);
+      const page = state.studioPage;
+
+      if (stagedArtworkMatches(active, page, bitstream)) {
+        const staged = state.stagedArtwork;
+        const transmissionSession = Transport.session;
         state.status = 'sending';
         state.progress = 0;
         updateStatusIndicator();
         updateTxHud();
         try {
-          await Transport.sendLine('{"cmd":"transmit"}');
+          await Transport.request(buildTransmitCommand(staged), 'artStarted');
         } catch (err) {
+          if (Transport.session !== transmissionSession || !Transport.isConnected()) return;
           state.status = 'error';
           updateStatusIndicator();
           updateTxHud();
@@ -1280,17 +1638,42 @@
         return;
       }
 
-      const canvas = document.getElementById('esl-canvas');
-      const bitstream = exportEslBitstream(canvas, active);
-
+      const uploadIdentity = {
+        session: Transport.session,
+        id: active.id,
+        page,
+        revision: state.contentRevision
+      };
+      state.stagedArtwork = null;
       state.status = 'uploading';
       state.progress = 0;
       updateStatusIndicator();
       updateTxHud();
 
       try {
-        await Transport.sendArtwork(active.id, state.studioPage, bitstream, active);
+        const stage = await Transport.sendArtwork(active.id, page, bitstream, active);
+        const current = getActiveTag();
+        const currentBits = current && current.graphic
+          ? exportEslBitstream(document.getElementById('esl-canvas'), current)
+          : null;
+        if (Transport.session !== uploadIdentity.session || !Transport.isConnected() ||
+            state.contentRevision !== uploadIdentity.revision || !current || current.id !== uploadIdentity.id ||
+            state.studioPage !== uploadIdentity.page || !sameBytes(bitstream, currentBits)) {
+          state.status = 'idle';
+          state.progress = 0;
+        } else {
+          state.stagedArtwork = {
+            ...uploadIdentity,
+            stage: stage.stage,
+            bitstream: bitstream.slice()
+          };
+          state.status = 'loaded';
+          state.progress = 0;
+        }
+        updateStatusIndicator();
+        updateTxHud();
       } catch (err) {
+        if (Transport.session !== uploadIdentity.session || !Transport.isConnected()) return;
         state.status = 'error';
         updateStatusIndicator();
         updateTxHud();
@@ -1299,17 +1682,16 @@
     });
 
     document.getElementById('header-target-select').addEventListener('change', (e) => {
-      state.activeTagId = e.target.value;
-      if (state.status === 'loaded' || state.status === 'sent') {
-        state.status = 'idle';
-        updateStatusIndicator();
-        updateTxHud();
+      if (state.activeTagId !== e.target.value) {
+        state.activeTagId = e.target.value;
+        invalidateArtwork();
       }
       renderTagSelector();
       renderSavedTags();
     });
 
     document.getElementById('btn-quick-blink').addEventListener('click', async () => {
+      if (state.status === 'uploading' || state.status === 'sending') return;
       const active = getActiveTag();
       if (!active) return;
       await Transport.sendLine(JSON.stringify({ cmd: 'blink', id: active.id }));
@@ -1358,7 +1740,10 @@
       btn.addEventListener('click', () => {
         document.querySelectorAll('#group-fit-mode .pill-opt').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-        state.studioFit = btn.dataset.fit;
+        if (state.studioFit !== btn.dataset.fit) {
+          state.studioFit = btn.dataset.fit;
+          invalidateArtwork();
+        }
         renderStudioImage();
       });
     });
@@ -1367,31 +1752,48 @@
       btn.addEventListener('click', () => {
         document.querySelectorAll('#group-dither-algo .pill-opt').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-        state.studioDither = btn.dataset.algo;
+        if (state.studioDither !== btn.dataset.algo) {
+          state.studioDither = btn.dataset.algo;
+          invalidateArtwork();
+        }
         renderStudioImage();
       });
     });
 
     const sliderContrast = document.getElementById('slider-contrast');
     sliderContrast.addEventListener('input', (e) => {
-      state.studioContrast = parseInt(e.target.value, 10);
+      const contrast = parseInt(e.target.value, 10);
+      if (state.studioContrast !== contrast) {
+        state.studioContrast = contrast;
+        invalidateArtwork();
+      }
       document.getElementById('lbl-contrast').textContent = e.target.value;
       renderStudioImage();
     });
 
     const sliderThreshold = document.getElementById('slider-threshold');
     sliderThreshold.addEventListener('input', (e) => {
-      state.studioThreshold = parseInt(e.target.value, 10);
+      const threshold = parseInt(e.target.value, 10);
+      if (state.studioThreshold !== threshold) {
+        state.studioThreshold = threshold;
+        invalidateArtwork();
+      }
       document.getElementById('lbl-threshold').textContent = e.target.value;
       renderStudioImage();
     });
 
     document.getElementById('chk-invert').addEventListener('change', (e) => {
-      state.studioInvert = e.target.checked;
+      if (state.studioInvert !== e.target.checked) {
+        state.studioInvert = e.target.checked;
+        invalidateArtwork();
+      }
       renderStudioImage();
     });
     document.getElementById('chk-color-plane').addEventListener('change', (e) => {
-      state.studioColorPlane = e.target.checked;
+      if (state.studioColorPlane !== e.target.checked) {
+        state.studioColorPlane = e.target.checked;
+        invalidateArtwork();
+      }
       renderStudioImage();
     });
 
@@ -1399,7 +1801,11 @@
       btn.addEventListener('click', () => {
         document.querySelectorAll('#group-target-page .pill-opt').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-        state.studioPage = parseInt(btn.dataset.page, 10);
+        const page = parseInt(btn.dataset.page, 10);
+        if (state.studioPage !== page) {
+          state.studioPage = page;
+          invalidateArtwork();
+        }
       });
     });
 
@@ -1407,13 +1813,17 @@
       btn.addEventListener('click', () => {
         document.querySelectorAll('#group-plugin-select .pill-opt').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-        state.activePlugin = btn.dataset.plugin;
+        if (state.activePlugin !== btn.dataset.plugin) {
+          state.activePlugin = btn.dataset.plugin;
+          invalidateArtwork();
+        }
         renderPluginForm();
         renderPluginCanvas();
       });
     });
 
     document.getElementById('btn-plugin-render').addEventListener('click', () => {
+      invalidateArtwork();
       renderPluginCanvas();
     });
 
@@ -1477,8 +1887,8 @@
       else if (Transport.type === 'serial') Transport.connectSerial();
     });
 
-    document.getElementById('btn-disconnect-active').addEventListener('click', () => {
-      Transport.disconnect();
+    document.getElementById('btn-disconnect-active').addEventListener('click', async () => {
+      await disconnectTransport();
     });
   }
 
@@ -1503,6 +1913,7 @@
           const res = await fetch(`https://api.github.com/users/${encodeURIComponent(u)}`);
           if (!res.ok) throw new Error('User not found');
           state._ghData = await res.json();
+          invalidateArtwork();
           renderPluginCanvas();
         } catch (e) {
           alert('GitHub fetch failed: ' + e.message);
@@ -1524,6 +1935,7 @@
             eth: json.ethereum?.usd || 0,
             sol: json.solana?.usd || 0
           };
+          invalidateArtwork();
           renderPluginCanvas();
         } catch (e) {
           alert('Crypto fetch failed: ' + e.message);
@@ -1536,7 +1948,10 @@
           <input type="text" class="input-text" id="clock-title" value="WORK NOTICE" maxlength="20">
         </div>
       `;
-      document.getElementById('clock-title').addEventListener('input', renderPluginCanvas);
+      document.getElementById('clock-title').addEventListener('input', () => {
+        invalidateArtwork();
+        renderPluginCanvas();
+      });
     }
   }
 

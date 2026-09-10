@@ -63,7 +63,8 @@ bool validCommand(const cJSON* json) {
     const bool numeric = std::strcmp(field->string, "width") == 0 ||
         std::strcmp(field->string, "height") == 0 || std::strcmp(field->string, "color") == 0 ||
         std::strcmp(field->string, "page") == 0 || std::strcmp(field->string, "len") == 0 ||
-        std::strcmp(field->string, "comp") == 0 || std::strcmp(field->string, "offset") == 0;
+        std::strcmp(field->string, "comp") == 0 || std::strcmp(field->string, "offset") == 0 ||
+        std::strcmp(field->string, "stage") == 0;
     if (numeric != bool(cJSON_IsNumber(field))) return false;
   }
   return cJSON_IsString(cJSON_GetObjectItemCaseSensitive(json, "cmd"));
@@ -76,6 +77,17 @@ bool base64Decode(const std::string& in, std::vector<std::uint8_t>& out) {
       reinterpret_cast<const unsigned char*>(in.data()), in.size()) != 0) return false;
   out.resize(length);
   return length > 0;
+}
+
+const char* browserStatus(const InfraredTransmitter::Status status,
+                          const bool hasStage, const bool isStageTransfer) {
+  if (hasStage && !isStageTransfer) return "loaded";
+  return status == InfraredTransmitter::Status::sending     ? "sending"
+         : status == InfraredTransmitter::Status::succeeded ? "sent"
+         : status == InfraredTransmitter::Status::error     ? "error"
+         : status == InfraredTransmitter::Status::cancelled ? "cancelled"
+         : hasStage                                         ? "loaded"
+                                                            : "idle";
 }
 
 } // namespace
@@ -96,18 +108,28 @@ bool BleBridge::begin(bool bluetooth) {
   rxSerialStream_.reset();
   resetUpload();
   staged_ = {};
+  activeStageToken_ = 0;
+  pairingPasskey_ = 0;
   // A session owns exactly one transport; USB avoids the BLE heap allocation.
   if (bluetooth && !bleInitialized_) {
     BLEDevice::init(deviceName_);
+    BLEDevice::setSecurityCallbacks(this);
     server_ = BLEDevice::createServer();
     if (!server_) return false;
     server_->setCallbacks(this);
     BLEService* service = server_->createService(NUS_SERVICE_UUID);
     if (!service) return false;
     txCharacteristic_ = service->createCharacteristic(NUS_TX_UUID, BLECharacteristic::PROPERTY_NOTIFY);
-    txCharacteristic_->addDescriptor(new BLE2902());
+    if (!txCharacteristic_) return false;
+    txCharacteristic_->setAccessPermissions(ESP_GATT_PERM_READ_ENC_MITM);
+    auto* notifications = new BLE2902();
+    notifications->setAccessPermissions(ESP_GATT_PERM_READ_ENC_MITM |
+                                        ESP_GATT_PERM_WRITE_ENC_MITM);
+    txCharacteristic_->addDescriptor(notifications);
     rxCharacteristic_ = service->createCharacteristic(NUS_RX_UUID,
         BLECharacteristic::PROPERTY_WRITE | BLECharacteristic::PROPERTY_WRITE_NR);
+    if (!rxCharacteristic_) return false;
+    rxCharacteristic_->setAccessPermissions(ESP_GATT_PERM_WRITE_ENC_MITM);
     rxCharacteristic_->setCallbacks(this);
     service->start();
     BLEAdvertising* advertising = BLEDevice::getAdvertising();
@@ -116,6 +138,16 @@ bool BleBridge::begin(bool bluetooth) {
     advertising->setMinPreferred(0x06);
     advertising->setMinPreferred(0x12);
     bleInitialized_ = true;
+  }
+  if (bluetooth) {
+    pairingPasskey_ = 100000U + esp_random() % 900000U;
+    BLESecurity security;
+    security.setStaticPIN(pairingPasskey_);
+    security.setCapability(ESP_IO_CAP_OUT);
+    security.setAuthenticationMode(ESP_LE_AUTH_REQ_SC_MITM);
+    security.setInitEncryptionKey(ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK);
+    security.setRespEncryptionKey(ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK);
+    BLEDevice::setSecurityCallbacks(this);
   }
   active_ = true;
   if (bluetooth) BLEDevice::startAdvertising();
@@ -129,7 +161,7 @@ void BleBridge::stop() {
     if (deviceConnected_) server_->disconnect(server_->getConnId());
   }
   deviceConnected_ = false;
-  oldDeviceConnected_ = false;
+  secureConnection_ = false;
   portENTER_CRITICAL(&rxMux_);
   rxBleSize_ = 0;
   rxBleOverflow_ = false;
@@ -140,14 +172,48 @@ void BleBridge::stop() {
   if (transmitter_.status() != InfraredTransmitter::Status::sending) {
     resetUpload();
     staged_ = {};
+    activeStageToken_ = 0;
   }
 }
 
 void BleBridge::onConnect(BLEServer* server) {
-  if (active_ && bleMode_) deviceConnected_ = true;
+  if (active_ && bleMode_) {
+    portENTER_CRITICAL(&rxMux_);
+    rxBleSize_ = 0;
+    rxBleOverflow_ = false;
+    portEXIT_CRITICAL(&rxMux_);
+    deviceConnected_.store(true);
+    secureConnection_.store(false);
+    connectionEpoch_.fetch_add(1);
+  }
   else server->disconnect(server->getConnId());
 }
-void BleBridge::onDisconnect(BLEServer* /*server*/) { deviceConnected_ = false; }
+void BleBridge::onDisconnect(BLEServer* /*server*/) {
+  portENTER_CRITICAL(&rxMux_);
+  rxBleSize_ = 0;
+  rxBleOverflow_ = false;
+  portEXIT_CRITICAL(&rxMux_);
+  deviceConnected_.store(false);
+  secureConnection_.store(false);
+  connectionEpoch_.fetch_add(1);
+}
+
+std::uint32_t BleBridge::onPassKeyRequest() { return pairingPasskey_.load(); }
+
+void BleBridge::onPassKeyNotify(std::uint32_t passkey) {
+  if (passkey >= 100000U && passkey <= 999999U) pairingPasskey_.store(passkey);
+}
+
+bool BleBridge::onSecurityRequest() { return active_ && bleMode_; }
+
+void BleBridge::onAuthenticationComplete(esp_ble_auth_cmpl_t result) {
+  secureConnection_.store(result.success && active_ && bleMode_ && deviceConnected_);
+}
+
+bool BleBridge::onConfirmPIN(std::uint32_t passkey) {
+  return active_ && bleMode_ && passkey == pairingPasskey_.load();
+}
+
 void BleBridge::onWrite(BLECharacteristic* characteristic) {
   if (!active_ || !bleMode_) return;
   const std::string value = characteristic->getValue();
@@ -162,6 +228,10 @@ void BleBridge::onWrite(BLECharacteristic* characteristic) {
 void BleBridge::resetUpload() {
   std::vector<std::uint8_t>().swap(artworkBuffer_);
   expectedArtworkSize_ = 0;
+  pendingCompression_ = -1;
+  pendingRecord_ = {};
+  pendingPage_ = 1;
+  encoded_ = {};
 }
 void BleBridge::receive(char c, BoundedLine<>& stream) {
   const auto event = stream.push(c);
@@ -174,6 +244,13 @@ void BleBridge::receive(char c, BoundedLine<>& stream) {
 void BleBridge::update() {
   if (!active_) return;
   if (bleMode_) {
+    const auto connectionEpoch = connectionEpoch_.load();
+    const bool connectionChanged = connectionEpoch != handledConnectionEpoch_;
+    if (connectionChanged) {
+      handledConnectionEpoch_ = connectionEpoch;
+      rxBleStream_.reset();
+      resetUpload();
+    }
     std::array<char, 2048> incoming{};
     portENTER_CRITICAL(&rxMux_);
     const auto length = rxBleSize_;
@@ -189,19 +266,23 @@ void BleBridge::update() {
       return;
     }
     for (std::size_t i = 0; i < length; ++i) receive(incoming[i], rxBleStream_);
-    if (!deviceConnected_ && oldDeviceConnected_) {
-      rxBleStream_.reset();
-      resetUpload();
+    if (connectionChanged && !deviceConnected_) {
       server_->startAdvertising();
     }
-    if (deviceConnected_ && !oldDeviceConnected_) sendState();
-    oldDeviceConnected_ = deviceConnected_.load();
+    if (connectionChanged && deviceConnected_) sendState();
   } else {
     for (unsigned n = 0; n < 512 && Serial.available(); ++n)
       receive(static_cast<char>(Serial.read()), rxSerialStream_);
   }
 
-  const auto status = transmitter_.status();
+  auto status = transmitter_.status();
+  if (bleMode_ && staged_.valid && staged_.connectionEpoch != connectionEpoch_.load() &&
+      status != InfraredTransmitter::Status::sending) {
+    staged_ = {};
+    activeStageToken_ = 0;
+    transmitter_.clearResult();
+    status = transmitter_.status();
+  }
   const std::uint8_t prog = transmitter_.progress();
   const std::uint32_t now = millis();
   const bool isSending = (status == InfraredTransmitter::Status::sending);
@@ -219,16 +300,24 @@ void BleBridge::update() {
     if (progressEligible) {
       lastProgressSentAt_ = now;
     }
-    const char* statusStr = status == InfraredTransmitter::Status::sending     ? "sending"
-                            : status == InfraredTransmitter::Status::succeeded ? "sent"
-                            : status == InfraredTransmitter::Status::error     ? "error"
-                            : status == InfraredTransmitter::Status::cancelled ? "cancelled"
-                            : staged_.valid                                    ? "loaded"
-                                                                               : "idle";
-    char statusJson[96];
-    std::snprintf(statusJson, sizeof(statusJson),
-                  "{\"status\":\"%s\",\"progress\":%u,\"speed\":\"%s\"}", statusStr, prog,
-                  transmitter_.fast() ? "fast" : "reliable");
+    const bool uploadActive = expectedArtworkSize_ != 0U;
+    const bool currentStage =
+        staged_.valid && (!bleMode_ || staged_.connectionEpoch == connectionEpoch_.load());
+    const bool stageTransfer = currentStage && activeStageToken_ == staged_.token;
+    const char* statusStr = uploadActive ? "uploading" : browserStatus(status, currentStage, stageTransfer);
+    const std::uint8_t browserProgress = uploadActive
+        ? static_cast<std::uint8_t>(artworkBuffer_.size() * 100U / expectedArtworkSize_)
+        : (currentStage && !stageTransfer ? 0U : prog);
+    std::string statusJson = "{\"status\":" + jsonEscape(statusStr) +
+                             ",\"progress\":" + std::to_string(browserProgress) +
+                             ",\"speed\":" +
+                             jsonEscape(transmitter_.fast() ? "fast" : "reliable");
+    if (currentStage) {
+      statusJson += ",\"id\":" + jsonEscape(idOf(staged_.record)) +
+                    ",\"page\":" + std::to_string(staged_.page) +
+                    ",\"stage\":" + std::to_string(staged_.token);
+    }
+    statusJson += "}";
     sendEvent("status", statusJson);
   }
 }
@@ -239,7 +328,7 @@ void BleBridge::sendLine(const std::string& line) {
   if (!bleMode_) Serial.print(fullLine.c_str());
 
   // Send over BLE in chunks of <= 20 bytes (safe for default MTU 23)
-  if (deviceConnected_ && txCharacteristic_ != nullptr) {
+  if (deviceConnected_ && secureConnection_ && txCharacteristic_ != nullptr) {
     constexpr std::size_t maxChunk = 20;
     for (std::size_t i = 0; i < fullLine.length(); i += maxChunk) {
       const std::string chunk = fullLine.substr(i, maxChunk);
@@ -274,17 +363,24 @@ const target::Record* BleBridge::findTargetById(const std::string& id) {
 
 void BleBridge::sendState() {
   const auto status = transmitter_.status();
-  const char* label = status == InfraredTransmitter::Status::sending     ? "sending"
-                      : status == InfraredTransmitter::Status::succeeded ? "sent"
-                      : status == InfraredTransmitter::Status::error     ? "error"
-                      : status == InfraredTransmitter::Status::cancelled ? "cancelled"
-                      : staged_.valid                                    ? "loaded"
-                                                                         : "idle";
+  const bool uploadActive = expectedArtworkSize_ != 0U;
+  const bool currentStage =
+      staged_.valid && (!bleMode_ || staged_.connectionEpoch == connectionEpoch_.load());
+  const bool stageTransfer = currentStage && activeStageToken_ == staged_.token;
+  const char* label = uploadActive ? "uploading" : browserStatus(status, currentStage, stageTransfer);
+  const auto progress = uploadActive
+      ? artworkBuffer_.size() * 100U / expectedArtworkSize_
+      : (currentStage && !stageTransfer ? 0U : transmitter_.progress());
 
   std::string json = "{\"device\":" + jsonEscape(deviceName_) + ",\"status\":\"" +
-                     std::string(label) + "\"" +
-                     ",\"speed\":" + jsonEscape(transmitter_.fast() ? "fast" : "reliable") +
-                     ",\"progress\":" + std::to_string(transmitter_.progress()) + ",\"tags\":[";
+                     std::string(label) + "\"";
+  if (currentStage) {
+    json += ",\"id\":" + jsonEscape(idOf(staged_.record)) +
+            ",\"page\":" + std::to_string(staged_.page) +
+            ",\"stage\":" + std::to_string(staged_.token);
+  }
+  json += ",\"speed\":" + jsonEscape(transmitter_.fast() ? "fast" : "reliable") +
+                     ",\"progress\":" + std::to_string(progress) + ",\"tags\":[";
 
   for (std::size_t i = 0; i < targets_.size(); ++i) {
     const auto& r = *targets_.get(i);
@@ -315,6 +411,22 @@ void BleBridge::processLine(const std::string& line) {
   const std::string cmd = extractJsonString(doc.get(), "cmd");
   if (cmd.empty())
     return;
+
+  if (expectedArtworkSize_ != 0U && cmd != "artChunk" && cmd != "finishArt" &&
+      cmd != "startArt" && cmd != "cancel" && cmd != "getState" && cmd != "setSpeed") {
+    resetUpload();
+    sendError("Artwork upload cancelled by another command. Upload again.");
+    return;
+  }
+
+  const auto announceLoaded = [this]() {
+    const std::string data = "{\"status\":\"loaded\",\"progress\":0,\"id\":" +
+                             jsonEscape(idOf(staged_.record)) + ",\"page\":" +
+                             std::to_string(staged_.page) + ",\"stage\":" +
+                             std::to_string(staged_.token) + "}";
+    sendEvent("artLoaded", data);
+    sendEvent("status", data);
+  };
 
   if (cmd == "getState") {
     sendState();
@@ -396,7 +508,18 @@ void BleBridge::processLine(const std::string& line) {
     const std::string id = extractJsonString(doc.get(), "id");
     for (std::size_t i = 0; i < targets_.size(); ++i) {
       if (idOf(*targets_.get(i)) == id) {
+        const bool removesStaged = staged_.valid && idOf(staged_.record) == id;
+        if (removesStaged && activeStageToken_ == staged_.token &&
+            transmitter_.status() == InfraredTransmitter::Status::sending) {
+          sendError("Wait for the transmission to finish before removing this tag.");
+          return;
+        }
         if (!targets_.erase(i)) { sendError("Could not remove saved device."); return; }
+        if (removesStaged) {
+          staged_ = {};
+          activeStageToken_ = 0;
+          transmitter_.clearResult();
+        }
         sendEvent("tagRemoved", "{\"id\":" + jsonEscape(id) + "}");
         sendState();
         return;
@@ -417,10 +540,18 @@ void BleBridge::processLine(const std::string& line) {
       sendError("Could not start blink transmission.");
       return;
     }
+    activeStageToken_ = 0;
     sendEvent("blinkStarted");
   } else if (cmd == "cancel") {
-    transmitter_.cancel();
-    sendEvent("cancelled");
+    if (expectedArtworkSize_ != 0U) {
+      resetUpload();
+      sendEvent("status", "{\"status\":\"idle\",\"progress\":0}");
+    } else if (transmitter_.status() == InfraredTransmitter::Status::sending) {
+      transmitter_.cancel();
+      sendEvent("cancelRequested");
+    } else {
+      sendError("No transmission is active.");
+    }
   } else if (cmd == "startArt") {
     if (transmitter_.status() == InfraredTransmitter::Status::sending) {
       sendError("Transmission in progress. Cancel or wait.");
@@ -428,6 +559,7 @@ void BleBridge::processLine(const std::string& line) {
     }
     resetUpload();
     staged_ = {};
+    activeStageToken_ = 0;
     const std::string id = extractJsonString(doc.get(), "id");
     const auto* r = findTargetById(id);
     if (!r || !target::capabilities(*r).displayUpdate) {
@@ -458,7 +590,11 @@ void BleBridge::processLine(const std::string& line) {
       resetUpload();
       sendError("Insufficient memory. Use USB after reboot or a simpler image."); return;
     }
-    artworkBuffer_.reserve(expectedArtworkSize_);
+    if (!image::reserveBytes(artworkBuffer_, expectedArtworkSize_)) {
+      resetUpload();
+      sendError("Insufficient contiguous memory. Reboot and use USB or a simpler image.");
+      return;
+    }
     sendEvent("artReady", "{\"len\":" + std::to_string(expectedArtworkSize_) + "}");
   } else if (cmd == "artChunk") {
     const std::string dataB64 = extractJsonString(doc.get(), "data");
@@ -502,12 +638,15 @@ void BleBridge::processLine(const std::string& line) {
       staged_.height = pendingRecord_.profile.height;
       staged_.compression = static_cast<std::uint8_t>(pendingCompression_);
       staged_.page = static_cast<std::uint8_t>(pendingPage_);
+      staged_.token = esp_random() & 0x7fffffffU;
+      if (staged_.token == 0U) staged_.token = 1U;
+      staged_.connectionEpoch = bleMode_ ? connectionEpoch_.load() : 0U;
       staged_.valid = true;
-      artworkBuffer_.clear();
-      expectedArtworkSize_ = 0;
+      activeStageToken_ = 0;
+      resetUpload();
 
-      sendEvent("artLoaded", "{\"status\":\"loaded\"}");
-      sendEvent("status", "{\"status\":\"loaded\",\"progress\":0}");
+      transmitter_.clearResult();
+      announceLoaded();
     } else {
       const std::size_t bits = std::size_t(pendingRecord_.profile.width) *
                                pendingRecord_.profile.height *
@@ -523,14 +662,27 @@ void BleBridge::processLine(const std::string& line) {
       staged_.height = pendingRecord_.profile.height;
       staged_.compression = encoded_.compression;
       staged_.page = static_cast<std::uint8_t>(pendingPage_);
+      staged_.token = esp_random() & 0x7fffffffU;
+      if (staged_.token == 0U) staged_.token = 1U;
+      staged_.connectionEpoch = bleMode_ ? connectionEpoch_.load() : 0U;
       staged_.valid = true;
-      artworkBuffer_.clear();
-      expectedArtworkSize_ = 0;
+      activeStageToken_ = 0;
+      resetUpload();
 
-      sendEvent("artLoaded", "{\"status\":\"loaded\"}");
-      sendEvent("status", "{\"status\":\"loaded\",\"progress\":0}");
+      transmitter_.clearResult();
+      announceLoaded();
     }
   } else if (cmd == "transmit" || cmd == "repeat") {
+    const std::string id = extractJsonString(doc.get(), "id");
+    const int page = extractJsonInt(doc.get(), "page", -1);
+    const int stage = extractJsonInt(doc.get(), "stage", -1);
+    if (!staged_.valid ||
+        (bleMode_ && staged_.connectionEpoch != connectionEpoch_.load()) || stage <= 0 ||
+        static_cast<std::uint32_t>(stage) != staged_.token ||
+        page != staged_.page || id != idOf(staged_.record)) {
+      sendError("Staged artwork identity mismatch. Upload again.");
+      return;
+    }
     if (!transmitStaged()) {
       sendError("No artwork staged or transmitter busy.");
     }
@@ -540,7 +692,8 @@ void BleBridge::processLine(const std::string& line) {
 }
 
 bool BleBridge::transmitStaged() {
-  if (!staged_.valid || staged_.data.empty() || !target::capabilities(staged_.record).displayUpdate)
+  if (!staged_.valid || (bleMode_ && staged_.connectionEpoch != connectionEpoch_.load()) ||
+      staged_.data.empty() || !target::capabilities(staged_.record).displayUpdate)
     return false;
   if (transmitter_.status() == InfraredTransmitter::Status::sending)
     return false;
@@ -558,7 +711,10 @@ bool BleBridge::transmitStaged() {
     sendError("IR transmitter failed to start.");
     return false;
   }
-  sendEvent("artStarted");
+  activeStageToken_ = staged_.token;
+  sendEvent("artStarted", "{\"id\":" + jsonEscape(idOf(staged_.record)) +
+                              ",\"page\":" + std::to_string(staged_.page) +
+                              ",\"stage\":" + std::to_string(staged_.token) + "}");
   return true;
 }
 
@@ -566,6 +722,8 @@ void BleBridge::clearStaged() {
   if (transmitter_.status() == InfraredTransmitter::Status::sending)
     return;
   staged_ = {};
+  activeStageToken_ = 0;
+  transmitter_.clearResult();
   sendEvent("status", "{\"status\":\"idle\",\"progress\":0}");
 }
 

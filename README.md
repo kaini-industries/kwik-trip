@@ -78,27 +78,27 @@ Download **cardputer-adv-factory.bin** into a folder and open a terminal in that
 
 ```sh
 python3.12 -m venv .venv
-.venv/bin/python -m pip install esptool==4.9.0
+.venv/bin/python -m pip install esptool==5.4.0
 .venv/bin/python -m serial.tools.list_ports
 ```
 
 Connect with a USB data cable, close any serial monitor, and replace `/dev/cu.YOUR_DEVICE` with the port from that list. Linux ports commonly look like `/dev/ttyACM0`.
 
 ```sh
-.venv/bin/python -m esptool --chip esp32s3 --port /dev/cu.YOUR_DEVICE --baud 460800 write_flash 0x0 cardputer-adv-factory.bin
+.venv/bin/python -m esptool --chip esp32s3 --port /dev/cu.YOUR_DEVICE --baud 460800 write-flash 0x0 cardputer-adv-factory.bin
 ```
 
 **Windows PowerShell:**
 
 ```powershell
 py -3.12 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install esptool==4.9.0
+.\.venv\Scripts\python.exe -m pip install esptool==5.4.0
 .\.venv\Scripts\python.exe -m serial.tools.list_ports
 # Replace COM5 with the Cardputer's port from the list.
-.\.venv\Scripts\python.exe -m esptool --chip esp32s3 --port COM5 --baud 460800 write_flash 0x0 cardputer-adv-factory.bin
+.\.venv\Scripts\python.exe -m esptool --chip esp32s3 --port COM5 --baud 460800 write-flash 0x0 cardputer-adv-factory.bin
 ```
 
-Wait for successful write verification, then restart the Cardputer. The factory image includes the bootloader, partition table, initial OTA data and application; no additional `.bin` files or separate full-chip erase are needed. Other ESP32 flash tools should use **ESP32-S3**, address **0x0**, **8 MB flash**, and preserve the image's **DIO / 80 MHz** settings. The commands above use esptool 4.9.0; esptool 5 calls the operation `write-flash`.
+Wait for successful write verification, then restart the Cardputer. The factory image includes the bootloader, partition table, initial OTA data and application; no additional `.bin` files or separate full-chip erase are needed. Other ESP32 flash tools should use **ESP32-S3**, address **0x0**, **8 MB flash**, and preserve the image's **DIO / 80 MHz** settings.
 
 If the port is missing or the connection fails, check the data cable and close programs using that port. To enter download mode manually, hold the Stamp's **G0** button while connecting USB, release it, then retry. Lower the baud to **115200** if transfers fail. See [M5Stack's Cardputer Advance guide](https://docs.m5stack.com/en/core/Cardputer-Adv) for download mode.
 
@@ -147,7 +147,7 @@ This mode updates content through the tag's existing firmware. It does not insta
 
 Up to nine IR devices are saved on the Cardputer. These records describe addresses and display settings; they do not mark hardware verified or authorize firmware programming. Segment records can be cataloged, but this UI provides image/text/blink operations only for graphic profiles.
 
-For the browser editor, run `make studio` on your computer and open [localhost:8000](http://localhost:8000). On the Cardputer choose **3 Browser editor → 1 USB serial** or **2 Bluetooth**, then select the same connection in the browser. USB is the recommended starting point. Prepare and preview artwork, push it to the Cardputer, then explicitly send it to the tag. Close the serial monitor before connecting the browser over USB.
+For the browser editor, run `make studio` on your computer and open [localhost:8000](http://localhost:8000). On the Cardputer choose **3 Browser editor → 1 USB serial** or **2 Bluetooth**, then select the same connection in the browser. USB is the recommended starting point. Bluetooth displays a six-digit pairing code on the Cardputer; enter it when the browser or operating system prompts. Prepare and preview artwork, push it to the Cardputer, then explicitly send it to the tag. Close the serial monitor before connecting the browser over USB.
 
 See the [display editing guide](docs/workflows/display-editing.md), [hardware test procedure](docs/workflows/cardputer-validation.md), and [TagTinker attribution](THIRD_PARTY_NOTICES.md).
 

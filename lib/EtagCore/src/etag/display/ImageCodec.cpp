@@ -2,11 +2,20 @@
 
 #include "ImageCodec.hpp"
 
+#include <algorithm>
 #include <limits>
+#include <new>
+#include <stdexcept>
 #include <utility>
 
 namespace tagtinker::image {
 namespace {
+
+constexpr std::size_t maximumSourceBits = 800U * 480U * 2U;
+constexpr std::size_t packetBits = 160U;
+constexpr std::size_t packetBytes = packetBits / 8U;
+constexpr std::size_t maximumEncodedBytes =
+    (std::numeric_limits<std::uint16_t>::max() / packetBytes) * packetBytes;
 
 bool bitAt(const std::vector<std::uint8_t>& bytes, const std::size_t index) {
   return (bytes[index / 8U] & (0x80U >> (index & 7U))) != 0U;
@@ -39,14 +48,48 @@ std::size_t runCodeBits(const std::size_t runLength) {
   return width * 2U - 1U;
 }
 
+bool paddedByteSize(const std::size_t encodedBits, std::size_t& bytes) {
+  if (encodedBits == 0U || encodedBits > maximumEncodedBytes * 8U) {
+    return false;
+  }
+  bytes = ((encodedBits + packetBits - 1U) / packetBits) * packetBytes;
+  return bytes <= maximumEncodedBytes;
+}
+
 } // namespace
 
-bool appendBit(std::vector<std::uint8_t>& bytes, std::size_t& bitCount, const bool value) {
+bool reserveBytes(std::vector<std::uint8_t>& bytes, const std::size_t capacity) noexcept {
+#if defined(__cpp_exceptions)
+  try {
+    bytes.reserve(capacity);
+  } catch (const std::bad_alloc&) {
+    return false;
+  } catch (const std::length_error&) {
+    return false;
+  }
+#else
+  bytes.reserve(capacity);
+#endif
+  return bytes.capacity() >= capacity;
+}
+
+bool appendBit(std::vector<std::uint8_t>& bytes, std::size_t& bitCount,
+               const bool value) noexcept {
   if ((bitCount & 7U) == 0U) {
     if (bytes.size() == bytes.max_size()) {
       return false;
     }
+#if defined(__cpp_exceptions)
+    try {
+      bytes.push_back(0);
+    } catch (const std::bad_alloc&) {
+      return false;
+    } catch (const std::length_error&) {
+      return false;
+    }
+#else
     bytes.push_back(0);
+#endif
   }
   if (value) {
     bytes.back() |= static_cast<std::uint8_t>(0x80U >> (bitCount & 7U));
@@ -55,9 +98,11 @@ bool appendBit(std::vector<std::uint8_t>& bytes, std::size_t& bitCount, const bo
   return true;
 }
 
-bool encode(const std::vector<std::uint8_t>& raw, const std::size_t bitCount, Encoded& result) {
+bool encode(const std::vector<std::uint8_t>& raw, const std::size_t bitCount,
+            Encoded& result) noexcept {
   result = {};
-  if (bitCount == 0U || bitCount > 800U * 480U * 2U || raw.size() < (bitCount + 7U) / 8U) {
+  if (bitCount == 0U || bitCount > maximumSourceBits ||
+      raw.size() < (bitCount + 7U) / 8U) {
     return false;
   }
 
@@ -78,12 +123,22 @@ bool encode(const std::vector<std::uint8_t>& raw, const std::size_t bitCount, En
   compressedBits += runCodeBits(runLength);
 
   const bool useCompression = compressedBits < bitCount;
+  const std::size_t encodedBits = useCompression ? compressedBits : bitCount;
+  std::size_t paddedBytes = 0;
+  if (!paddedByteSize(encodedBits, paddedBytes)) {
+    return false;
+  }
+
+  // Allocate the final packet-aligned output exactly once. In particular, do not
+  // reserve the unpadded RLE size and then double the live allocation on resize.
+  std::vector<std::uint8_t> encoded;
+  if (!reserveBytes(encoded, paddedBytes)) {
+    return false;
+  }
   if (useCompression) {
-    std::vector<std::uint8_t> compressed;
-    compressed.reserve((compressedBits + 7U) / 8U);
     std::size_t writtenBits = 0;
     runPixel = bitAt(raw, 0);
-    if (!appendBit(compressed, writtenBits, runPixel)) {
+    if (!appendBit(encoded, writtenBits, runPixel)) {
       return false;
     }
     runLength = 1;
@@ -93,37 +148,30 @@ bool encode(const std::vector<std::uint8_t>& raw, const std::size_t bitCount, En
         ++runLength;
         continue;
       }
-      if (!appendRunCode(compressed, writtenBits, runLength)) {
+      if (!appendRunCode(encoded, writtenBits, runLength)) {
         return false;
       }
       runPixel = pixel;
       runLength = 1;
     }
-    if (!appendRunCode(compressed, writtenBits, runLength)) {
+    if (!appendRunCode(encoded, writtenBits, runLength) || writtenBits != compressedBits) {
       return false;
     }
-    result.bytes = std::move(compressed);
   } else {
-    result.bytes = raw;
+    encoded.insert(encoded.end(), raw.begin(), raw.begin() + (bitCount + 7U) / 8U);
   }
   result.sourceBits = bitCount;
-  result.encodedBits = useCompression ? compressedBits : bitCount;
+  result.encodedBits = encodedBits;
   result.compression = useCompression ? 2U : 0U;
-
-  // Pad to whole data packets.
-  const std::size_t paddedBits = ((result.encodedBits + 159U) / 160U) * 160U;
-  const std::size_t paddedBytes = paddedBits / 8U;
-  if (paddedBytes > std::numeric_limits<std::uint16_t>::max()) {
-    result = {};
-    return false;
-  }
-  result.bytes.resize(paddedBytes, 0);
+  encoded.resize(paddedBytes, 0);
+  result.bytes = std::move(encoded);
   return true;
 }
 
 bool validate(const std::vector<std::uint8_t>& bytes, const int compression,
               const std::size_t sourceBits) {
-  if (sourceBits == 0 || sourceBits > 800U * 480U * 2U || bytes.empty() || bytes.size() > 65520U ||
+  if (sourceBits == 0 || sourceBits > maximumSourceBits || bytes.empty() ||
+      bytes.size() > maximumEncodedBytes ||
       bytes.size() % 20U != 0)
     return false;
   if (compression == 0)
@@ -153,19 +201,33 @@ bool validate(const std::vector<std::uint8_t>& bytes, const int compression,
   return true;
 }
 
-void RleStreamEncoder::begin(const std::size_t totalBits) {
-  compressed_.clear();
-  compressed_.reserve(std::min<std::size_t>(totalBits / 8U + 160U, 8192U));
+bool RleStreamEncoder::begin(const std::size_t totalBits) noexcept {
+  compressed_ = {};
   writtenBits_ = 0;
   totalPixelsSeen_ = 0;
   expectedBits_ = totalBits;
   runLength_ = 0;
   currentPixel_ = false;
   started_ = false;
+  ready_ = false;
+  finished_ = false;
+  if (totalBits == 0U || totalBits > maximumSourceBits) {
+    return false;
+  }
+
+  // One initial color bit plus a one-bit run code per source bit is the
+  // largest possible RLE stream. Cap the allocation at the wire limit; later
+  // appends fail before attempting to exceed it.
+  const std::size_t maximumRleBits = totalBits + 1U;
+  const std::size_t reserveSize = std::min(
+      maximumEncodedBytes,
+      ((maximumRleBits + packetBits - 1U) / packetBits) * packetBytes);
+  ready_ = reserveBytes(compressed_, reserveSize);
+  return ready_;
 }
 
 bool RleStreamEncoder::append(const bool pixel) {
-  if (totalPixelsSeen_ >= expectedBits_ || compressed_.size() > 65520U)
+  if (!ready_ || finished_ || totalPixelsSeen_ >= expectedBits_)
     return false;
   if (!started_) {
     started_ = true;
@@ -178,7 +240,10 @@ bool RleStreamEncoder::append(const bool pixel) {
   if (pixel == currentPixel_) {
     ++runLength_;
   } else {
-    if (!appendRunCode(compressed_, writtenBits_, runLength_)) {
+    const std::size_t codeBits = runCodeBits(runLength_);
+    if (writtenBits_ > maximumEncodedBytes * 8U - codeBits ||
+        !appendRunCode(compressed_, writtenBits_, runLength_)) {
+      ready_ = false;
       return false;
     }
     currentPixel_ = pixel;
@@ -189,7 +254,8 @@ bool RleStreamEncoder::append(const bool pixel) {
 }
 
 bool RleStreamEncoder::appendRun(const std::size_t count, const bool pixel) {
-  if (count > expectedBits_ - totalPixelsSeen_ || compressed_.size() > 65520U)
+  if (!ready_ || finished_ || totalPixelsSeen_ > expectedBits_ ||
+      count > expectedBits_ - totalPixelsSeen_)
     return false;
   if (count == 0U) {
     return true;
@@ -205,7 +271,10 @@ bool RleStreamEncoder::appendRun(const std::size_t count, const bool pixel) {
   if (pixel == currentPixel_) {
     runLength_ += count;
   } else {
-    if (!appendRunCode(compressed_, writtenBits_, runLength_)) {
+    const std::size_t codeBits = runCodeBits(runLength_);
+    if (writtenBits_ > maximumEncodedBytes * 8U - codeBits ||
+        !appendRunCode(compressed_, writtenBits_, runLength_)) {
+      ready_ = false;
       return false;
     }
     currentPixel_ = pixel;
@@ -217,25 +286,32 @@ bool RleStreamEncoder::appendRun(const std::size_t count, const bool pixel) {
 
 bool RleStreamEncoder::finish(Encoded& result) {
   result = {};
-  if (!started_ || totalPixelsSeen_ == 0U || totalPixelsSeen_ != expectedBits_) {
+  if (!ready_ || finished_ || !started_ || totalPixelsSeen_ == 0U ||
+      totalPixelsSeen_ != expectedBits_) {
     return false;
   }
 
-  if (!appendRunCode(compressed_, writtenBits_, runLength_))
+  const std::size_t codeBits = runCodeBits(runLength_);
+  if (writtenBits_ > maximumEncodedBytes * 8U - codeBits ||
+      !appendRunCode(compressed_, writtenBits_, runLength_)) {
+    ready_ = false;
     return false;
+  }
 
   result.sourceBits = totalPixelsSeen_;
   result.encodedBits = writtenBits_;
   result.compression = 2U; // RLE
 
-  const std::size_t paddedBits = ((writtenBits_ + 159U) / 160U) * 160U;
-  const std::size_t paddedBytes = paddedBits / 8U;
-  if (paddedBytes > std::numeric_limits<std::uint16_t>::max()) {
+  std::size_t paddedBytes = 0;
+  if (!paddedByteSize(writtenBits_, paddedBytes) || paddedBytes > compressed_.capacity()) {
     result = {};
+    ready_ = false;
     return false;
   }
   compressed_.resize(paddedBytes, 0);
   result.bytes = std::move(compressed_);
+  finished_ = true;
+  ready_ = false;
   return true;
 }
 

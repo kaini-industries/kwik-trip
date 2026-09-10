@@ -8,6 +8,7 @@
 #include <BLE2902.h>
 #include <BLEDevice.h>
 #include <BLEServer.h>
+#include <BLESecurity.h>
 #include <BLEUtils.h>
 
 #include <etag/display/BoundedLine.hpp>
@@ -18,7 +19,9 @@
 
 namespace tagtinker {
 
-class BleBridge final : public BLEServerCallbacks, public BLECharacteristicCallbacks {
+class BleBridge final : public BLEServerCallbacks,
+                        public BLECharacteristicCallbacks,
+                        public BLESecurityCallbacks {
 public:
   BleBridge(TargetStore& targets, InfraredTransmitter& transmitter);
   ~BleBridge();
@@ -34,12 +37,16 @@ public:
     std::uint16_t height = 0;
     std::uint8_t compression = 0;
     std::uint8_t page = 0;
+    std::uint32_t token = 0;
+    std::uint32_t connectionEpoch = 0;
     bool valid = false;
   };
 
   [[nodiscard]] bool active() const { return active_; }
   [[nodiscard]] bool connected() const { return deviceConnected_; }
+  [[nodiscard]] bool secure() const { return secureConnection_; }
   [[nodiscard]] const std::string& deviceName() const { return deviceName_; }
+  [[nodiscard]] std::uint32_t pairingPasskey() const { return pairingPasskey_.load(); }
   [[nodiscard]] bool hasStaged() const { return staged_.valid; }
   [[nodiscard]] const StagedArtwork& staged() const { return staged_; }
   bool transmitStaged();
@@ -57,8 +64,11 @@ private:
   std::atomic<bool> active_{false};
   bool bleMode_ = false;
   bool bleInitialized_ = false;
+  std::atomic<std::uint32_t> pairingPasskey_{0};
   std::atomic<bool> deviceConnected_{false};
-  bool oldDeviceConnected_ = false;
+  std::atomic<bool> secureConnection_{false};
+  std::atomic<std::uint32_t> connectionEpoch_{0};
+  std::uint32_t handledConnectionEpoch_ = 0;
 
   portMUX_TYPE rxMux_ = portMUX_INITIALIZER_UNLOCKED;
   std::array<char, 2048> rxBleQueue_{};
@@ -80,11 +90,17 @@ private:
   std::uint32_t lastProgressSentAt_ = 0;
   InfraredTransmitter::Status lastReportedStatus_ = InfraredTransmitter::Status::idle;
   StagedArtwork staged_{};
+  std::uint32_t activeStageToken_ = 0;
 
   void onConnect(BLEServer* server) override;
   void onDisconnect(BLEServer* server) override;
 
   void onWrite(BLECharacteristic* characteristic) override;
+  std::uint32_t onPassKeyRequest() override;
+  void onPassKeyNotify(std::uint32_t passkey) override;
+  bool onSecurityRequest() override;
+  void onAuthenticationComplete(esp_ble_auth_cmpl_t result) override;
+  bool onConfirmPIN(std::uint32_t passkey) override;
 
   void sendLine(const std::string& line);
   void processLine(const std::string& line);

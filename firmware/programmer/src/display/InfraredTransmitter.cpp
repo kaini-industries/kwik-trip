@@ -106,6 +106,17 @@ void InfraredTransmitter::cancel() {
   }
 }
 
+void InfraredTransmitter::clearResult() {
+  auto previous = status_.load();
+  while (previous != Status::sending && previous != Status::unavailable &&
+         previous != Status::idle &&
+         !status_.compare_exchange_weak(previous, Status::idle)) {
+  }
+  if (previous != Status::sending && previous != Status::unavailable) {
+    progress_.store(0);
+  }
+}
+
 InfraredTransmitter::Status InfraredTransmitter::status() const { return status_.load(); }
 
 std::uint8_t InfraredTransmitter::progress() const { return progress_.load(); }

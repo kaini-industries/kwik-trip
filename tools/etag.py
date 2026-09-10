@@ -21,7 +21,9 @@ def check():
             raise ValueError(f'Original reference changed: {record["path"]}')
     for doc in ROOT.rglob("*.md"):
         relative = doc.relative_to(ROOT)
-        if any(part.startswith(".") for part in relative.parts) or str(relative).startswith("docs/reference/legacy/"):
+        if (any(part.startswith(".") for part in relative.parts) or
+                relative.parts[0] == "artifacts" or
+                str(relative).startswith("docs/reference/legacy/")):
             continue
         for target in re.findall(r"\]\(([^)]+)\)", doc.read_text()):
             target = target.split("#", 1)[0].strip("<>")

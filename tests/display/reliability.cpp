@@ -16,7 +16,7 @@ static void roundTrip(const std::vector<std::uint8_t>& raw, std::size_t count) {
   image::Encoded batch, streamed;
   assert(image::encode(raw, count, batch));
   image::RleStreamEncoder encoder;
-  encoder.begin(count);
+  assert(encoder.begin(count));
   for (std::size_t i = 0; i < count; ++i)
     assert(encoder.append(bit(raw, i)));
   assert(!encoder.append(false));
@@ -89,11 +89,23 @@ int main() {
     }
   }
   image::RleStreamEncoder incomplete;
-  incomplete.begin(100);
+  assert(incomplete.begin(100));
   assert(incomplete.appendRun(99, true));
   image::Encoded result;
   assert(!incomplete.finish(result));
   assert(!incomplete.appendRun(2, true));
+
+  image::RleStreamEncoder completed;
+  assert(completed.begin(160));
+  assert(completed.appendRun(160, true));
+  assert(completed.finish(result));
+  assert(!completed.finish(result));
+  assert(!completed.append(false));
+  assert(!completed.appendRun(0, false));
+
+  image::RleStreamEncoder invalid;
+  assert(!invalid.begin(0));
+  assert(!invalid.begin(800U * 480U * 2U + 1U));
   assert(!image::validate(std::vector<std::uint8_t>(20), 2, 100));
 
   for (const auto encoding : {esl::Encoding::pp4, esl::Encoding::pp16}) {

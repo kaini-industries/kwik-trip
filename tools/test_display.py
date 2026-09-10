@@ -27,6 +27,13 @@ def main():
                            cwd=ROOT, check=True)
             subprocess.run([output], cwd=ROOT, check=True)
             print(f"PASS: {name}", flush=True)
+        allocation = str(Path(directory) / "allocation")
+        subprocess.run(compiler + ["-std=c++17", "-Wall", "-Wextra", "-Werror", "-g",
+                         f"-I{DISPLAY}", "tests/display/allocation.cpp",
+                         str(DISPLAY / "ImageCodec.cpp"), "-o", allocation],
+                       cwd=ROOT, check=True)
+        subprocess.run([allocation], cwd=ROOT, check=True)
+        print("PASS: allocation", flush=True)
     subprocess.run(["node", "tests/display/web.cjs"], cwd=ROOT, check=True)
 
 if __name__ == "__main__":

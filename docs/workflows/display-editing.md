@@ -26,11 +26,11 @@ Run `make studio` at the project root, then open [localhost:8000](http://localho
 
 On the Cardputer choose **3 → 1 USB serial**, then select USB SERIAL in the browser and connect. Use a data-capable USB cable and close PlatformIO's serial monitor first. Desktop Chrome or Edge is a useful starting point; browser support varies by operating system. The editor's normal image workflow also works without camera access.
 
-For Bluetooth, choose **3 → 2 Bluetooth** on the Cardputer and BLUETOOTH in the editor. Look for `etag Cardputer XXXX`. Only that selected transport accepts commands for the session. Exit the Cardputer browser screen to stop advertising and disconnect. The BLE service object/controller are retained for reuse until reboot; reboot and select USB if image preparation runs low on memory.
+For Bluetooth, choose **3 → 2 Bluetooth** on the Cardputer and BLUETOOTH in the editor. Look for `etag Cardputer XXXX`. The Cardputer shows a new six-digit pairing code when Bluetooth mode starts; enter it when the browser or operating system prompts. Commands and notifications require authenticated, encrypted BLE. Only that selected transport accepts commands for the session. Exit the Cardputer browser screen to stop advertising and disconnect. The BLE service object/controller are retained for reuse until reboot; reboot and select USB if image preparation runs low on memory.
 
-Add a device using its barcode. Manual entry provides a display preset for an unknown model; raw hexadecimal IDs are not supported. For more detailed modulation/orientation overrides, edit the saved record on the Cardputer. Device saves await an acknowledgement from the Cardputer.
+Add a device using its barcode. Manual entry provides a display preset for an unknown model; raw hexadecimal IDs are not supported. Custom dimensions, palette, and orientation can be edited on the Cardputer. The current profiles select PP16 for graphic displays and PP4 for segment displays; there is no manual modulation override in this UI. Device saves await an acknowledgement from the Cardputer.
 
-Select a device, prepare/dither the artwork, and push it to the Cardputer. Upload chunks have offsets and acknowledgements; encoded image sizes and compression are validated. Uploading stages artwork without transmitting it. Aim at the tag and press Enter on the Cardputer or the browser's Send control. Cancel/back clears or exits as indicated on-screen.
+Select a device, prepare/dither the artwork, and push it to the Cardputer. Upload chunks have offsets and acknowledgements; encoded image sizes and compression are validated. Uploading stages artwork without transmitting it. The browser records the acknowledged target, page, content revision and Cardputer stage token; Send is refused if any of them changes. Aim at the tag and press Enter on the Cardputer or the browser's Send control. Cancel/back clears or exits as indicated on-screen.
 
 ## Relationship to programming
 

@@ -52,6 +52,7 @@ public:
   bool start(const Plan& plan);
   bool startImage(const ImageTransfer& transfer);
   void cancel();
+  void clearResult();
   void setFast(bool fast) { fast_.store(fast); }
   [[nodiscard]] bool fast() const { return fast_.load(); }
 

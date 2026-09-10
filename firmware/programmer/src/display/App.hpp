@@ -114,6 +114,7 @@ private:
   std::uint16_t customHeight_ = 0;
   bool customProfileSize_ = false;
   bool editingProfile_ = false;
+  bool saveError_ = false;
   std::uint8_t page_ = 0;
   std::uint8_t targetPage_ = 1;
   render::TextStyle textStyle_{};
@@ -152,7 +153,7 @@ private:
   void startTargetImage(Transmission content);
   bool prepareTextImage();
   bool prepareFileImage(const char* path);
-  void savePendingTarget();
+  [[nodiscard]] bool savePendingTarget();
   void resetInput();
 
   void drawSplash();

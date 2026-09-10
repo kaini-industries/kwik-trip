@@ -36,7 +36,7 @@ Select the Cardputer USB port and baud **460800** (reduce to **115200** if neede
 
 ## Standard ESP32 USB flashing
 
-Install the project's [development environment](../../../docs/development.md), or install `esptool==4.9.0` into a Python virtual environment. With both downloads in your current folder, verify them first:
+Install the project's [development environment](../../../docs/development.md), or install `esptool==5.4.0` into a Python virtual environment. With both downloads in your current folder, verify them first:
 
 ```sh
 # macOS
@@ -49,10 +49,10 @@ Download `manifest.json` too when using the checksum command. On Windows, compar
 Use a USB data cable and close any serial monitor. Replace the port below with the Cardputer's port (`COM5` is a Windows example):
 
 ```sh
-python -m esptool --chip esp32s3 --port /dev/cu.YOUR_DEVICE --baud 460800 write_flash 0x0 cardputer-adv-factory.bin
+python -m esptool --chip esp32s3 --port /dev/cu.YOUR_DEVICE --baud 460800 write-flash 0x0 cardputer-adv-factory.bin
 ```
 
-The command is for pinned esptool **4.9.0**. Esptool 5 spells the command `write-flash`. For other flash tools, select **ESP32-S3**, **8 MB**, image address **0x0**, and preserve the file's flash settings (**DIO, 80 MHz**). The Arduino bootloader initializes the board's QIO flash operation itself. This is an ordinary unencrypted ESP32-S3 image.
+The command uses pinned esptool **5.4.0**. For other flash tools, select **ESP32-S3**, **8 MB**, image address **0x0**, and preserve the file's flash settings (**DIO, 80 MHz**). The Arduino bootloader initializes the board's QIO flash operation itself. This is an ordinary unencrypted ESP32-S3 image.
 
 If automatic download mode fails, follow [M5Stack's Cardputer Advance download-mode procedure](https://docs.m5stack.com/en/core/Cardputer-Adv): hold the Stamp's **G0** button while connecting USB, then release and retry. Restart after installation.
 
@@ -61,7 +61,7 @@ The factory file writes the complete range from `0x0` through the application, i
 For an existing **standalone etag installation using this exact partition layout and booting app0**, an app-only update preserves NVS:
 
 ```sh
-python -m esptool --chip esp32s3 --port /dev/cu.YOUR_DEVICE --baud 460800 write_flash 0x10000 cardputer-adv-app.bin
+python -m esptool --chip esp32s3 --port /dev/cu.YOUR_DEVICE --baud 460800 write-flash 0x10000 cardputer-adv-app.bin
 ```
 
 ## Layout and verification

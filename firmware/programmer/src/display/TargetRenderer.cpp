@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 #include "TargetRenderer.hpp"
+#include "ImageMetadata.hpp"
 #include <esp_heap_caps.h>
 #include <etag/display/Validation.hpp>
 
@@ -16,65 +17,7 @@ namespace {
 constexpr std::size_t maximumLines = 16;
 using Line = std::array<char, 65>;
 
-struct ImageSize {
-  std::uint32_t width = 0;
-  std::uint32_t height = 0;
-};
-
-std::uint16_t readBig16(File& file) {
-  const int high = file.read();
-  const int low = file.read();
-  return high < 0 || low < 0 ? 0U : static_cast<std::uint16_t>((high << 8U) | low);
-}
-
-std::uint32_t big32(const std::uint8_t* bytes) {
-  return (static_cast<std::uint32_t>(bytes[0]) << 24U) |
-         (static_cast<std::uint32_t>(bytes[1]) << 16U) |
-         (static_cast<std::uint32_t>(bytes[2]) << 8U) | bytes[3];
-}
-
-std::uint32_t little32(const std::uint8_t* bytes) {
-  return static_cast<std::uint32_t>(bytes[0]) | (static_cast<std::uint32_t>(bytes[1]) << 8U) |
-         (static_cast<std::uint32_t>(bytes[2]) << 16U) |
-         (static_cast<std::uint32_t>(bytes[3]) << 24U);
-}
-
-bool jpegSize(File& file, ImageSize& size) {
-  file.seek(2);
-  while (file.available()) {
-    int prefix = file.read();
-    while (prefix != 0xff && prefix >= 0) {
-      prefix = file.read();
-    }
-    int marker = file.read();
-    while (marker == 0xff) {
-      marker = file.read();
-    }
-    if (marker < 0 || marker == 0xd9 || marker == 0xda) {
-      return false;
-    }
-    if (marker == 0x01 || (marker >= 0xd0 && marker <= 0xd7)) {
-      continue;
-    }
-    const std::uint16_t length = readBig16(file);
-    if (length < 2U) {
-      return false;
-    }
-    const bool startOfFrame =
-        (marker >= 0xc0 && marker <= 0xc3) || (marker >= 0xc5 && marker <= 0xc7) ||
-        (marker >= 0xc9 && marker <= 0xcb) || (marker >= 0xcd && marker <= 0xcf);
-    if (startOfFrame) {
-      file.read();
-      size.height = readBig16(file);
-      size.width = readBig16(file);
-      return size.width != 0U && size.height != 0U;
-    }
-    file.seek(file.position() + length - 2U);
-  }
-  return false;
-}
-
-bool imageSize(fs::FS& fileSystem, const char* path, ImageSize& size) {
+bool imageSize(fs::FS& fileSystem, const char* path, metadata::ImageSize& size) {
   File source = fileSystem.open(path, FILE_READ);
   if (!source) {
     return false;
@@ -82,25 +25,18 @@ bool imageSize(fs::FS& fileSystem, const char* path, ImageSize& size) {
   std::array<std::uint8_t, 26> header{};
   const std::size_t read = source.read(header.data(), header.size());
   bool valid = false;
-  if (read >= 24U && header[0] == 0x89 && header[1] == 'P' && header[2] == 'N' &&
+  if (read >= 8U && header[0] == 0x89 && header[1] == 'P' && header[2] == 'N' &&
       header[3] == 'G') {
-    size.width = big32(header.data() + 16);
-    size.height = big32(header.data() + 20);
-    valid = true;
-  } else if (read >= 26U && header[0] == 'B' && header[1] == 'M') {
-    size.width = little32(header.data() + 18);
-    const std::int32_t signedHeight = static_cast<std::int32_t>(little32(header.data() + 22));
-    size.height = static_cast<std::uint32_t>(signedHeight < 0 ? -signedHeight : signedHeight);
-    valid = true;
+    valid = metadata::pngSize(header.data(), read, size);
+  } else if (read >= 2U && header[0] == 'B' && header[1] == 'M') {
+    valid = metadata::bmpSize(header.data(), read, size);
   } else if (read >= 12U && std::memcmp(header.data(), "qoif", 4) == 0) {
-    size.width = big32(header.data() + 4);
-    size.height = big32(header.data() + 8);
-    valid = true;
+    valid = metadata::qoiSize(header.data(), read, size);
   } else if (read >= 2U && header[0] == 0xff && header[1] == 0xd8) {
-    valid = jpegSize(source, size);
+    valid = metadata::jpegSize(source, size);
   }
   source.close();
-  return valid && size.width != 0U && size.height != 0U;
+  return valid;
 }
 
 bool extract(M5Canvas& canvas, const target::Profile& profile, std::vector<std::uint8_t>& raw,
@@ -108,7 +44,9 @@ bool extract(M5Canvas& canvas, const target::Profile& profile, std::vector<std::
   const std::size_t pixelCount = static_cast<std::size_t>(profile.width) * profile.height;
   const bool hasColorPlane = profile.color != target::Color::mono;
   raw.clear();
-  raw.reserve((pixelCount * (hasColorPlane ? 2U : 1U) + 7U) / 8U);
+  if (!image::reserveBytes(raw, (pixelCount * (hasColorPlane ? 2U : 1U) + 7U) / 8U)) {
+    return false;
+  }
   writtenBits = 0;
 
   for (std::uint16_t y = 0; y < profile.height; ++y) {
@@ -386,7 +324,9 @@ bool text(M5GFX& display, const target::Profile& profile, const char* value, con
   strip.setTextDatum(datum);
 
   image::RleStreamEncoder encoder;
-  encoder.begin(bitCount);
+  if (!encoder.begin(bitCount)) {
+    return false;
+  }
   for (unsigned plane = 0; plane < (hasColorPlane ? 2U : 1U); ++plane) {
     for (std::uint16_t row = 0; row < profile.height; row += stripRows) {
       const auto rows = std::min<std::uint16_t>(stripRows, profile.height - row);
@@ -427,7 +367,7 @@ bool file(M5GFX& display, fs::FS& fileSystem, const char* path, const target::Pr
       (profile.color == target::Color::mono ? 1U : 2U) / 8U;
   if (ESP.getFreeHeap() < rawBytes * 3U + 32768U ||
       heap_caps_get_largest_free_block(MALLOC_CAP_8BIT) < rawBytes + 16384U) return false;
-  ImageSize sourceSize{};
+  metadata::ImageSize sourceSize{};
   if (!imageSize(fileSystem, path, sourceSize)) {
     return false;
   }

@@ -15,16 +15,19 @@ struct Encoded {
   std::uint8_t compression = 0;
 };
 
-[[nodiscard]] bool appendBit(std::vector<std::uint8_t>& bytes, std::size_t& bitCount, bool value);
+[[nodiscard]] bool reserveBytes(std::vector<std::uint8_t>& bytes,
+                                std::size_t capacity) noexcept;
+[[nodiscard]] bool appendBit(std::vector<std::uint8_t>& bytes, std::size_t& bitCount,
+                             bool value) noexcept;
 [[nodiscard]] bool encode(const std::vector<std::uint8_t>& raw, std::size_t bitCount,
-                          Encoded& result);
+                          Encoded& result) noexcept;
 
 [[nodiscard]] bool validate(const std::vector<std::uint8_t>& bytes, int compression,
                             std::size_t sourceBits);
 
 class RleStreamEncoder {
 public:
-  void begin(std::size_t totalBits);
+  [[nodiscard]] bool begin(std::size_t totalBits) noexcept;
   bool append(bool pixel);
   bool appendRun(std::size_t count, bool pixel);
   bool finish(Encoded& result);
@@ -37,6 +40,8 @@ private:
   std::size_t runLength_ = 0;
   bool currentPixel_ = false;
   bool started_ = false;
+  bool ready_ = false;
+  bool finished_ = false;
 };
 
 } // namespace tagtinker::image
