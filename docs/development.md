@@ -12,9 +12,11 @@ Use the project-local Python 3.12 virtual environment. A global PlatformIO insta
 | M5Unified / M5GFX | 0.2.21 / 0.2.28 |
 | IRremote transitive dependency | 4.4.1; no IR feature enabled |
 | Native platform / Unity | 1.2.1 / 2.6.1 |
-| Intel MCS51 platform / SDCC package | 2.2.0 / 1.40400.0 (SDCC 4.4.0) |
+| Intel MCS51 platform / SDCC package | 2.2.0 / 1.40100.12072 (SDCC 4.1.0, revision 12072) |
 
 PlatformIO's ESP image generator imports Python dependencies such as `intelhex`; these are supplied by the pinned `esptool` requirement, including when the global package cache was populated by a different interpreter. The PlatformIO cache is shared by default; source, build outputs and virtual environment are local. No global package files need manual editing.
+
+The CC2510 example pins the same SDCC release on Linux x86_64, macOS, and Windows. The registry's newer `1.40400.0` package has no Linux distribution, so a build using that pin can pass on macOS and fail before compilation on GitHub's Linux runner. Check the [official package's platform coverage](https://registry.platformio.org/tools/platformio/toolchain-sdcc) before changing it; a newer package number alone does not establish cross-platform availability.
 
 Native tests retain Unity's runner through [PlatformIO's custom runner extension](https://docs.platformio.org/en/latest/advanced/unit-testing/frameworks/custom/examples/custom_unity_library.html), disabling its additional floating dependency so the exact `lib_deps` pin controls the test library.
 

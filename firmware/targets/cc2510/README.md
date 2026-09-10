@@ -2,6 +2,8 @@
 
 This is a separate PlatformIO/SDCC project. Build from the repository root with `make build-tag`, or run `pio run` here using the activated project virtual environment.
 
+The compiler is pinned to `platformio/toolchain-sdcc@1.40100.12072` (SDCC 4.1.0). This release is available for Linux x86_64, macOS, and Windows, allowing the same project to build locally and on GitHub Actions. Package `1.40400.0` is not published for Linux.
+
 The `cc2510f32-smoke` image leaves peripheral GPIO/RF configuration at reset defaults and increments an XRAM counter. It is a compile/link diagnostic for an independently confirmed CC2510F32, not a display demo and not a generic image for the pictured tags. It does not initialize the crystal, blink a board LED, or implement sleep. Flashing it replaces the running application.
 
 The custom board sets 32,768 bytes of code, 256 bytes of fast IRAM and 3,840 bytes of slow XRAM. `configure.py` sets slow XRAM origin to `0xF000` and code origin to zero. Inspect the generated `.map` and `.mem`; the initialized `etag_ticks` counter should be at `0xF000` in this minimal build. Upper slow RAM has sleep-retention constraints when low-power firmware is introduced.
