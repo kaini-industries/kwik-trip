@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "id": "ses-edg3-0220-b",
+  "manufacturer": "SES-imagotag",
+  "model": "VUSION 2.2 BWR GL440 / EDG3-0220-B",
+  "revision": null,
+  "status": "candidate",
+  "protocol": "ti_cc_debug",
+  "mcu": {"family": "CC2510", "part": null, "chip_id": 129, "flash_bytes": null},
+  "power": {"target_mv": null},
+  "display": {"controller": null, "width": null, "height": null, "colors": ["black", "white", "red"]},
+  "evidence": ["hardware/tags/ses-edg3-0220-b/photos/6D99A372-3531-4457-8470-B0A48CB888F9.jpeg"],
+  "notes": ["Only the exterior label is confirmed. MCU family/protocol are hypotheses from related tags.", "Confirm MCU suffix, power, pad map, panel and PCB revision before promoting this profile."]
+}

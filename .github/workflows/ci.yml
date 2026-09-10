@@ -1,0 +1,60 @@
+name: Validate and build
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: python -m pip install -r requirements-dev.txt
+      - run: python tools/etag.py check
+      - run: python -m unittest discover -s tests -v
+      - run: pio test -e native
+
+  esp32:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: [cardputer-adv, esp32-devkit, esp32-s3-devkit]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: python -m pip install -r requirements-dev.txt
+      - uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: pio-${{ runner.os }}-${{ matrix.environment }}-${{ hashFiles('platformio.ini', 'config/platformio/*.ini', 'requirements-*.txt') }}
+      - run: pio run -e ${{ matrix.environment }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: programmer-${{ matrix.environment }}
+          path: |
+            .pio/build/${{ matrix.environment }}/firmware.bin
+            .pio/build/${{ matrix.environment }}/firmware.elf
+
+  cc2510:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: python -m pip install -r requirements-dev.txt
+      - run: pio run -d firmware/targets/cc2510
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cc2510f32-smoke-compile-only
+          path: |
+            firmware/targets/cc2510/.pio/build/cc2510f32-smoke/firmware.hex
+            firmware/targets/cc2510/.pio/build/cc2510f32-smoke/firmware.map

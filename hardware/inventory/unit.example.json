@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "unit_id": "replace-with-local-unit-id",
+  "profile_id": "replace-with-profile-id",
+  "pcb_revision": null,
+  "mcu_marking": null,
+  "panel_marking": null,
+  "measured_supply_mv": null,
+  "chip_id": null,
+  "debug_status": null,
+  "backup_directory": null,
+  "notes": ["Copy to <unit>.local.json. This is an inventory template, not a runtime profile."]
+}

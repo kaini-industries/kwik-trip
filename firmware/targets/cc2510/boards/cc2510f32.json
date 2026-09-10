@@ -1,0 +1,12 @@
+{
+  "build": {
+    "core": "naked", "cpu": "mcs51", "mcu": "cc2510f32",
+    "f_cpu": "13000000L", "size_iram": 256, "size_xram": 3840,
+    "size_code": 32768, "size_heap": 0, "extra_flags": "-DETAG_CC2510F32"
+  },
+  "frameworks": [],
+  "upload": {"maximum_ram_size": 4096, "maximum_size": 32768, "protocol": "custom"},
+  "name": "TI CC2510F32 (compile-only smoke image)",
+  "url": "https://www.ti.com/product/CC2510",
+  "vendor": "Texas Instruments"
+}

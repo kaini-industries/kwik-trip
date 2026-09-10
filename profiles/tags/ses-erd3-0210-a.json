@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "id": "ses-erd3-0210-a",
+  "manufacturer": "SES-imagotag",
+  "model": "ERD3-0210-A (exterior reading)",
+  "revision": null,
+  "status": "unknown",
+  "protocol": "unknown",
+  "mcu": {"family": null, "part": null, "chip_id": null, "flash_bytes": null},
+  "power": {"target_mv": null},
+  "display": {"controller": null, "width": null, "height": null, "colors": []},
+  "evidence": ["hardware/tags/ses-erd3-0210-a/photos/D0B2DFE9-E5D8-4819-A1C6-937D9060D471.jpeg"],
+  "notes": ["Do not apply the GL440 pad map or assume a CC2510. Identify this unit independently."]
+}

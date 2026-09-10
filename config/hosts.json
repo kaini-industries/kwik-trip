@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "hosts": [
+    {
+      "id": "cardputer-adv", "name": "Cardputer Advance", "board": "m5stack-stamps3",
+      "soc": "esp32s3", "dd": 4, "dc": 6, "reset": 15,
+      "reserved_pins": [0, 3, 8, 9, 10, 11, 12, 14, 19, 20, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 48],
+      "notes": "Advance only. EXT 5VOUT needs a regulated target supply; see hardware/hosts/cardputer-adv."
+    },
+    {
+      "id": "esp32-devkit", "name": "ESP32 DevKit", "board": "esp32dev",
+      "soc": "esp32", "dd": 23, "dc": 19, "reset": 33,
+      "reserved_pins": [0, 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 15],
+      "notes": "Classic ESP32-WROOM DevKit with 4 MB flash; inspect clones before wiring."
+    },
+    {
+      "id": "esp32-s3-devkit", "name": "ESP32-S3 DevKit", "board": "esp32-s3-devkitc-1",
+      "soc": "esp32s3", "dd": 4, "dc": 6, "reset": 15,
+      "reserved_pins": [0, 3, 19, 20, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 45, 46, 48],
+      "notes": "Generic N8 baseline; choose the matching flash/PSRAM board configuration for other modules."
+    }
+  ]
+}

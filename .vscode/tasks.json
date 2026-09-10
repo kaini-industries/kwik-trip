@@ -1,0 +1,8 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {"label": "etag: validate everything", "type": "process", "command": "make", "args": ["validate"], "options": {"cwd": "${workspaceFolder}"}, "problemMatcher": "$gcc"},
+    {"label": "etag: build Cardputer Advance", "type": "process", "command": "${workspaceFolder}/.venv/bin/pio", "args": ["run", "-e", "cardputer-adv"], "options": {"cwd": "${workspaceFolder}"}, "group": {"kind": "build", "isDefault": true}, "problemMatcher": "$gcc"},
+    {"label": "etag: tests", "type": "process", "command": "make", "args": ["test"], "options": {"cwd": "${workspaceFolder}"}, "group": "test", "problemMatcher": []}
+  ]
+}

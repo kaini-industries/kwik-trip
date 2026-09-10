@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "files": [
+    {
+      "original_path": "FLASHING_PLAN.md",
+      "path": "docs/plans/cardputer-advance-flashing-plan.md",
+      "sha256": "a1db60c3841a6195f4f1842f1a15e39ba29fa44560205a2a7be661b83a21343a"
+    },
+    {
+      "original_path": "vusion-cc2510-esp32-flashing-guide.md",
+      "path": "docs/reference/legacy/vusion-cc2510-esp32-flashing-guide.md",
+      "sha256": "840da098cbb403c5d5817904db654aec24e69b04cba5996772b5378b2ec3db74"
+    },
+    {
+      "original_path": "vusion-esl-hacking-notes.md",
+      "path": "docs/reference/legacy/vusion-esl-hacking-notes.md",
+      "sha256": "a93bd9f4bf43d2976d228f4868a2a70baba1de16c7a49553d8e93a929c46497f"
+    },
+    {
+      "original_path": "6D99A372-3531-4457-8470-B0A48CB888F9.jpeg",
+      "path": "hardware/tags/ses-edg3-0220-b/photos/6D99A372-3531-4457-8470-B0A48CB888F9.jpeg",
+      "sha256": "ed778c9e0ae88d59aabb0114856592070082900bca74e8894820cc2f8c49d636"
+    },
+    {
+      "original_path": "D0B2DFE9-E5D8-4819-A1C6-937D9060D471.jpeg",
+      "path": "hardware/tags/ses-erd3-0210-a/photos/D0B2DFE9-E5D8-4819-A1C6-937D9060D471.jpeg",
+      "sha256": "360a9f1a322182ee7ad52dba21b1a64c14ff3cafcfb79de973f85eec0b34e9c0"
+    }
+  ]
+}

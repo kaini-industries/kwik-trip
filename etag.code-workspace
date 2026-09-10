@@ -1,0 +1,6 @@
+{
+  "folders": [
+    {"name": "ESP32 programmer", "path": "."},
+    {"name": "CC2510 target", "path": "firmware/targets/cc2510"}
+  ]
+}
